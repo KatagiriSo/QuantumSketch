@@ -4,6 +4,8 @@ This is a Feynmann Diagram editor.
 
 ![Demo mov](demo.gif)
 
+v: Add point
+
 p: Add Propagator
 
 l: Add Loop
@@ -14,16 +16,18 @@ t: allow direction change
 
 q: line style change
 
-r: select reverse
+c: select reverse
 
-click: select
+@: remove arrow
 
-double click: sub select
+click: select (red)
 
-n: next select
+double click: sub select (green)
 
-b: pre select
+n: next select (red)
 
-s: next sub select
+b: pre select (green)
 
-a: pre sub select
+s: next sub select (red)
+
+a: pre sub select (green)
