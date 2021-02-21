@@ -167,9 +167,15 @@ class Line implements Elem {
         let toLength = this.to.minus(point).length()
         let originLength = this.origin.minus(point).length()
         if (toLength < originLength) {
-            return toLength
+            if (toLength > 2) {
+                return toLength
+            }
+            return toLength + 1
         }
-        return originLength
+        if (originLength > 2) {
+            return originLength
+        }
+        return originLength + 1
 
     }
 }
@@ -711,7 +717,7 @@ class RDRepository {
             let indexDistance = indexElement.formalDistance(point)
             let currentDistance = current.formalDistance(point)
             if (indexDistance <= currentDistance && this.currentIndex != index) {
-                if (this.selectCount <= 1 || this.currentSubIndex != index) {
+                if (/*this.selectCount <= 1 || this.currentSubIndex != index*/true) {
                     console.log(`near:${findIndex}`)
                     findIndex = index
                     current = indexElement
