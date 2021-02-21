@@ -4,6 +4,12 @@ This is a Feynmann Diagram editor.
 
 ![Demo mov](demo.gif)
 
+# Usage
+
+Open main.html in your browser.
+
+# Operation Rule
+
 v: Add point
 
 p: Add Propagator
