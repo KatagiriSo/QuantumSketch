@@ -37,3 +37,6 @@ b: pre select (green)
 s: next sub select (red)
 
 a: pre sub select (green)
+
+# LICENSE
+MIT
