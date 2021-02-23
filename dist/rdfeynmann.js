@@ -56,6 +56,11 @@ class Vector {
     formalDistance(point) {
         return this.minus(point).length();
     }
+    move(delta) {
+        let vector = this.add(delta);
+        this.x = vector.x;
+        this.y = vector.y;
+    }
 }
 class MyString {
     constructor(label) {
@@ -67,6 +72,9 @@ class MyString {
         let str = new MyString(this.label);
         str.origin = this.origin;
         return str;
+    }
+    move(delta) {
+        this.origin = this.origin.add(delta);
     }
     formalDistance(point) {
         return this.origin.minus(point).length();
@@ -95,6 +103,10 @@ class Line {
         line.origin = this.origin;
         line.to = this.to;
         return line;
+    }
+    move(delta) {
+        this.origin = this.origin.add(delta);
+        this.to = this.to.add(delta);
     }
     length() {
         return this.to.minus(this.origin).length();
@@ -162,6 +174,9 @@ class Loop {
         loop.labels = this.labels;
         loop.style = this.style;
         return loop;
+    }
+    move(delta) {
+        this.origin = this.origin.add(delta);
     }
     addLineTo(line) {
         line.to = this.origin.add(direction(line.origin, this.origin).unit().multi(this.radius));
@@ -853,6 +868,42 @@ class RDDraw {
         if (ev.key == "z") {
             this.noSelectMode();
         }
+        if (ev.key == "8") {
+            this.keyUp();
+        }
+        if (ev.key == "6") {
+            this.keyRight();
+        }
+        if (ev.key == "4") {
+            this.keyLeft();
+        }
+        if (ev.key == "2") {
+            this.keyDown();
+        }
+    }
+    keyUp() {
+        console.log("keyUp");
+        let current = this.repository.currentElement();
+        current === null || current === void 0 ? void 0 : current.move(new Vector(0, -1));
+        this.drawAll();
+    }
+    keyRight() {
+        console.log("keyRight");
+        let current = this.repository.currentElement();
+        current === null || current === void 0 ? void 0 : current.move(new Vector(1, 0).multi(1 / config.scale));
+        this.drawAll();
+    }
+    keyLeft() {
+        console.log("keyLeft");
+        let current = this.repository.currentElement();
+        current === null || current === void 0 ? void 0 : current.move(new Vector(-1, 0).multi(1 / config.scale));
+        this.drawAll();
+    }
+    keyDown() {
+        console.log("keyDown");
+        let current = this.repository.currentElement();
+        current === null || current === void 0 ? void 0 : current.move(new Vector(0, 1).multi(1 / config.scale));
+        this.drawAll();
     }
     noSelectMode() {
         this.isNoSelectMode = !this.isNoSelectMode;

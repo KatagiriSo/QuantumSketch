@@ -45,5 +45,13 @@ a: pre sub select (green)
 
 z: no select mode In/Out
 
+8: up select target
+
+6: right select target
+
+4: left select target
+
+2: down select target
+
 # LICENSE
 MIT

@@ -13,6 +13,7 @@ type Shape = "Line" | "Loop" | "Point" | "String"
 interface Elem {
     shape: Shape
     formalDistance(point: Vector): number
+    move(delta:Vector):void
 }
 
 let config: Config = {
@@ -78,6 +79,12 @@ class Vector implements Elem {
     formalDistance(point: Vector): number {
         return this.minus(point).length()
     }
+
+    move(delta: Vector): void {
+        let vector = this.add(delta)
+        this.x = vector.x
+        this.y = vector.y
+    }
 }
 
 class MyString implements Elem {
@@ -91,6 +98,10 @@ class MyString implements Elem {
     }
     constructor(label: string) {
         this.label = label
+    }
+
+    move(delta: Vector): void {
+        this.origin = this.origin.add(delta)
     }
 
     formalDistance(point: Vector): number {
@@ -125,6 +136,11 @@ class Line implements Elem {
         if (label) {
             this.label = label
         }
+    }
+
+    move(delta: Vector): void {
+        this.origin =  this.origin.add(delta)
+        this.to = this.to.add(delta)
     }
 
     length(): number {
@@ -211,6 +227,10 @@ class Loop implements Elem {
         if (label) {
             this.label = label
         }
+    }
+
+    move(delta: Vector): void {
+        this.origin =  this.origin.add(delta)
     }
 
     addLineTo(line: Line) {
@@ -1035,6 +1055,50 @@ class RDDraw {
         if (ev.key == "z") {
             this.noSelectMode()
         }
+
+        if (ev.key == "8") {
+            this.keyUp()
+        }
+
+        if (ev.key == "6") {
+            this.keyRight()
+        }
+
+        if (ev.key == "4") {
+            this.keyLeft()
+        }
+
+        if (ev.key == "2") {
+            this.keyDown()
+        }
+    }
+
+    keyUp() {
+        console.log("keyUp")
+        let current = this.repository.currentElement()
+        current?.move(new Vector(0, -1))
+        this.drawAll()
+    }
+
+    keyRight() {
+        console.log("keyRight")
+        let current = this.repository.currentElement()
+        current?.move(new Vector(1, 0).multi(1/config.scale))
+        this.drawAll()
+    }
+
+    keyLeft() {
+        console.log("keyLeft")
+        let current = this.repository.currentElement()
+        current?.move(new Vector(-1, 0).multi(1 / config.scale))
+        this.drawAll()
+    }
+
+    keyDown() {
+        console.log("keyDown")
+        let current = this.repository.currentElement()
+        current?.move(new Vector(0, 1).multi(1 / config.scale))
+        this.drawAll()
     }
 
     noSelectMode() {
