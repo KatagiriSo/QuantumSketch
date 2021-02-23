@@ -4,6 +4,11 @@ This is a Feynmann Diagram editor.
 
 ![Demo mov](demo.gif)
 
+![sample png](sample.png)
+
+![sample2 png](sample2.png)
+
+
 # Usage
 
 Open main.html in your browser.
