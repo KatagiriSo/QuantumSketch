@@ -968,21 +968,21 @@ class RDDraw {
         if (this.stringMode != undefined) {
 
             if (ev.key == "/") {
-                let current = this.repository.currentElement()
-                if (current && isLine(current)) {
-                    current.label = this.stringMode
-                    this.stringMode = undefined
-                    console.log("stringMode OUT")
-                    this.drawAll()
-                    return
-                }
-                if (current && isLoop(current)) {
-                    current.label = this.stringMode
-                    this.stringMode = undefined
-                    console.log("stringMode OUT")
-                    this.drawAll()
-                    return
-                }
+                // let current = this.repository.currentElement()
+                // if (current && isLine(current)) {
+                //     current.label = this.stringMode
+                //     this.stringMode = undefined
+                //     console.log("stringMode OUT")
+                //     this.drawAll()
+                //     return
+                // }
+                // if (current && isLoop(current)) {
+                //     current.label = this.stringMode
+                //     this.stringMode = undefined
+                //     console.log("stringMode OUT")
+                //     this.drawAll()
+                //     return
+                // }
                 let str = new MyString(this.stringMode)
                 str.origin = new Vector(x, y)
                 this.repository.doCommand(new SetString(str))
