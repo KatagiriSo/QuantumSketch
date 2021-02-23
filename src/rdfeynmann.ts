@@ -1071,12 +1071,20 @@ class RDDraw {
         if (ev.key == "2") {
             this.keyDown()
         }
+
+        if (ev.key == "w") {
+            this.changeScale()
+        }
+
+        if (ev.key == "x") {
+            this.changeScaleDown()
+        }
     }
 
     keyUp() {
         console.log("keyUp")
         let current = this.repository.currentElement()
-        current?.move(new Vector(0, -1))
+        current?.move(new Vector(0, -1).multi(1 / config.scale))
         this.drawAll()
     }
 
@@ -1261,6 +1269,49 @@ class RDDraw {
             return
         }
         if (isLoop(elem)) {
+            return
+        }
+    }
+
+    changeScale() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+        if (isLine(elem)) {
+            elem.to = elem.to.add(elem.directionUnit())
+            this.drawAll()
+            return
+        }
+        if (isLoop(elem)) {
+            elem.radius = elem.radius + 1
+            this.drawAll()
+            return
+        }
+    }
+
+    changeScaleDown() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+        if (isLine(elem)) {
+            elem.to = elem.to.add(elem.directionUnit().multi(-1))
+            this.drawAll()
+            return
+        }
+        if (isLoop(elem)) {
+            elem.radius = elem.radius - 1
+            if (elem.radius < 1) {
+                elem.radius = 1
+            }
+            this.drawAll()
             return
         }
     }

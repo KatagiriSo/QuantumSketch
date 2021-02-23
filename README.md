@@ -53,5 +53,9 @@ z: no select mode In/Out
 
 2: down select target
 
+w: scale up
+
+x: scale down
+
 # LICENSE
 MIT
