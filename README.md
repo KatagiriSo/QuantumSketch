@@ -4,6 +4,8 @@ This is a Feynmann Diagram editor.
 
 ![Demo mov](demo.gif)
 
+![Demo2 mov](demo2.gif)
+
 ![sample png](sample.png)
 
 ![sample2 png](sample2.png)
