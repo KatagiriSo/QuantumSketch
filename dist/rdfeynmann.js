@@ -492,20 +492,23 @@ class RDRepository {
         this.vertexList = [];
         this.loopList = [];
         this.lineList = [];
-        this.currentIndex = 0;
-        this.currentSubIndex = 0;
+        this.currentIndex = undefined;
+        this.currentSubIndex = undefined;
         this.elements = [];
         this.selectCount = 0;
         this.history = [];
     }
     currentElement() {
-        if (this.currentIndex < this.elements.length) {
+        // console.log("currentElement:length:"+this.elements.length)
+        // console.log("currentIndex:"+this.currentIndex)
+        if (this.currentIndex != undefined && (this.currentIndex < this.elements.length)) {
             return this.elements[this.currentIndex];
         }
+        // console.log("no currentElement")
         return undefined;
     }
     currentSubElement() {
-        if (this.currentSubIndex < this.elements.length) {
+        if (this.currentSubIndex != undefined && (this.currentSubIndex < this.elements.length)) {
             return this.elements[this.currentSubIndex];
         }
         return undefined;
@@ -531,6 +534,9 @@ class RDRepository {
         return this.elements;
     }
     deleteCurrentEelemnt() {
+        if (this.currentIndex == undefined) {
+            return;
+        }
         let currentElem = this.currentElement();
         if (!currentElem) {
             return;
@@ -559,6 +565,7 @@ class RDRepository {
         this.vertexList.push(vertex);
         this.elements.push(vertex);
         this.currentIndex = this.elements.length - 1;
+        console.log("currentIndex" + this.currentIndex);
     }
     setLoop(loop) {
         const x = loop.origin.x;
@@ -584,24 +591,51 @@ class RDRepository {
         this.currentIndex = this.elements.length - 1;
     }
     nextElem() {
+        console.log("nextElem");
+        if (this.currentIndex == undefined) {
+            if (this.elements.length == 0) {
+                console.log("nextElem return");
+                return;
+            }
+            this.currentIndex = -1;
+        }
         this.currentIndex = this.currentIndex + 1;
         if (this.currentIndex >= this.elements.length) {
             this.currentIndex = 0;
         }
+        console.log("currentIndex" + this.currentIndex);
     }
     nextSubElem() {
+        if (this.currentSubIndex == undefined) {
+            if (this.elements.length == 0) {
+                return;
+            }
+            this.currentSubIndex = -1;
+        }
         this.currentSubIndex = this.currentSubIndex + 1;
         if (this.currentSubIndex >= this.elements.length) {
             this.currentSubIndex = 0;
         }
     }
     preElem() {
+        if (this.currentIndex == undefined) {
+            if (this.elements.length == 0) {
+                return;
+            }
+            this.currentIndex = +1;
+        }
         this.currentIndex = this.currentIndex - 1;
         if (this.currentIndex < 0) {
             this.currentIndex = (this.elements.length != 0) ? this.elements.length - 1 : 0;
         }
     }
     preSubElem() {
+        if (this.currentSubIndex == undefined) {
+            if (this.elements.length == 0) {
+                return;
+            }
+            this.currentSubIndex = +1;
+        }
         this.currentSubIndex = this.currentSubIndex - 1;
         if (this.currentSubIndex < 0) {
             this.currentSubIndex = (this.elements.length != 0) ? this.elements.length - 1 : 0;
@@ -658,6 +692,10 @@ class RDRepository {
             }
         }
         this.currentSubIndex = findIndex;
+    }
+    clearSelectMode() {
+        this.currentIndex = undefined;
+        this.currentSubIndex = undefined;
     }
     changeSelect() {
         const currentIndex = this.currentIndex;
@@ -818,6 +856,9 @@ class RDDraw {
     }
     noSelectMode() {
         this.isNoSelectMode = !this.isNoSelectMode;
+        if (this.isNoSelectMode) {
+            this.repository.clearSelectMode();
+        }
         this.drawAll();
     }
     nextElem() {

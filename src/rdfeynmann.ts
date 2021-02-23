@@ -8,7 +8,7 @@ interface Config {
     scale: number
 }
 
-type Shape = "Line" | "Loop" | "Point" | "String"
+type Shape = "Line" | "Loop" | "Point" | "String" 
 
 interface Elem {
     shape: Shape
@@ -42,6 +42,7 @@ function isLoop(elem: Elem): elem is Loop {
 function isLine(elem: Elem): elem is Line {
     return elem.shape == "Line"
 }
+
 
 class Vector implements Elem {
     shape: Shape = "Point"
@@ -601,22 +602,26 @@ class RDRepository {
     vertexList: Vector[] = []
     loopList: Loop[] = []
     lineList: Line[] = []
-    currentIndex: number = 0
-    currentSubIndex: number = 0
+    currentIndex: number|undefined = undefined
+    currentSubIndex: number| undefined = undefined
     elements: Elem[] = []
     selectCount: number = 0
 
     history: RepositoryCommand[] = []
 
     currentElement(): Elem | undefined {
-        if (this.currentIndex < this.elements.length) {
+        // console.log("currentElement:length:"+this.elements.length)
+        // console.log("currentIndex:"+this.currentIndex)
+
+        if (this.currentIndex != undefined && (this.currentIndex < this.elements.length)) {
             return this.elements[this.currentIndex]
         }
+        // console.log("no currentElement")
         return undefined
     }
 
     currentSubElement(): Elem | undefined {
-        if (this.currentSubIndex < this.elements.length) {
+        if (this.currentSubIndex != undefined && (this.currentSubIndex < this.elements.length)) {
             return this.elements[this.currentSubIndex]
         }
         return undefined
@@ -651,6 +656,9 @@ class RDRepository {
     }
 
     deleteCurrentEelemnt() {
+        if (this.currentIndex == undefined) {
+            return
+        }
         let currentElem = this.currentElement()
         if (!currentElem) {
             return
@@ -683,6 +691,7 @@ class RDRepository {
         this.vertexList.push(vertex)
         this.elements.push(vertex)
         this.currentIndex = this.elements.length - 1
+        console.log("currentIndex"+ this.currentIndex)
     }
 
     setLoop(loop: Loop) {
@@ -712,13 +721,28 @@ class RDRepository {
     }
 
     nextElem() {
+        console.log("nextElem")
+        if (this.currentIndex == undefined) {
+            if (this.elements.length == 0) {
+                console.log("nextElem return")
+                return
+            }
+            this.currentIndex = -1
+        }
         this.currentIndex = this.currentIndex + 1
         if (this.currentIndex >= this.elements.length) {
             this.currentIndex = 0
         }
+        console.log("currentIndex" + this.currentIndex)
     }
 
     nextSubElem() {
+        if (this.currentSubIndex == undefined) {
+            if (this.elements.length == 0) {
+                return
+            }
+            this.currentSubIndex = -1
+        }
         this.currentSubIndex = this.currentSubIndex + 1
         if (this.currentSubIndex >= this.elements.length) {
             this.currentSubIndex = 0
@@ -726,6 +750,12 @@ class RDRepository {
     }
 
     preElem() {
+        if (this.currentIndex == undefined) {
+            if (this.elements.length == 0) {
+                return
+            }
+            this.currentIndex = +1
+        }
         this.currentIndex = this.currentIndex - 1
         if (this.currentIndex < 0) {
             this.currentIndex = (this.elements.length != 0) ? this.elements.length - 1 : 0
@@ -733,6 +763,12 @@ class RDRepository {
     }
 
     preSubElem() {
+        if (this.currentSubIndex == undefined) {
+            if (this.elements.length == 0) {
+                return
+            }
+            this.currentSubIndex = +1
+        }
         this.currentSubIndex = this.currentSubIndex - 1
         if (this.currentSubIndex < 0) {
             this.currentSubIndex = (this.elements.length != 0) ? this.elements.length - 1 : 0
@@ -795,6 +831,11 @@ class RDRepository {
 
         this.currentSubIndex = findIndex
 
+    }
+
+    clearSelectMode() {
+        this.currentIndex = undefined
+        this.currentSubIndex = undefined
     }
 
     changeSelect() {
@@ -998,6 +1039,9 @@ class RDDraw {
 
     noSelectMode() {
         this.isNoSelectMode = !this.isNoSelectMode
+        if (this.isNoSelectMode) {
+            this.repository.clearSelectMode()
+        }
         this.drawAll()
     }
 
