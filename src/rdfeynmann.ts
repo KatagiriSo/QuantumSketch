@@ -8,23 +8,23 @@ interface Config {
     scale: number
 }
 
-type Shape = "Line" | "Loop" |"Point" | "String"
+type Shape = "Line" | "Loop" | "Point" | "String"
 
 interface Elem {
     shape: Shape
-    formalDistance(point:Vector):number
+    formalDistance(point: Vector): number
 }
 
 let config: Config = {
     /// lattice size
-    scale:15
+    scale: 15
 }
 
 function direction(v1: Vector, v2: Vector): Vector {
     return v1.minus(v2)
 }
 
-function textPosition(text: string, position: Vector, config:Config) {
+function textPosition(text: string, position: Vector, config: Config) {
     //TODO
     let scale = config.scale
     return position.add(new Vector(-3 / scale, +3 / scale))// font 仮定
@@ -58,13 +58,13 @@ class Vector implements Elem {
         return new Vector(this.x - vec.x, this.y - vec.y)
     }
     length(): number {
-        return ((this.x)**2 + (this.y)**2)**(1/2)
+        return ((this.x) ** 2 + (this.y) ** 2) ** (1 / 2)
     }
     multi(num: number): Vector {
         return new Vector(this.x * num, this.y * num)
     }
     unit(): Vector {
-        return new Vector(this.x * (1/this.length()), this.y * (1/this.length()))
+        return new Vector(this.x * (1 / this.length()), this.y * (1 / this.length()))
     }
     copy(): Vector {
         return new Vector(this.x, this.y)
@@ -74,7 +74,7 @@ class Vector implements Elem {
         return new Vector(this.x * Math.cos(angle) - this.y * Math.sin(angle), this.x * Math.sin(angle) + this.y * Math.cos(angle))
     }
 
-    formalDistance(point:Vector): number {
+    formalDistance(point: Vector): number {
         return this.minus(point).length()
     }
 }
@@ -88,7 +88,7 @@ class MyString implements Elem {
         str.origin = this.origin
         return str
     }
-    constructor(label:string) {
+    constructor(label: string) {
         this.label = label
     }
 
@@ -105,8 +105,8 @@ class Line implements Elem {
     label: string = ""
     style: LineStyle = "normal"
     labelDiff: number = 0
-    allow:Boolean = true
-    origin: Vector = new Vector(0,0)
+    allow: Boolean = true
+    origin: Vector = new Vector(0, 0)
     to: Vector = new Vector(0, 0)
 
     copy(): Line {
@@ -125,7 +125,7 @@ class Line implements Elem {
             this.label = label
         }
     }
-    
+
     length(): number {
         return this.to.minus(this.origin).length()
     }
@@ -141,9 +141,9 @@ class Line implements Elem {
     }
 
     directionUnit(): Vector {
-        return this.direction().multi(1/this.length())
+        return this.direction().multi(1 / this.length())
     }
-   
+
     addLoopOrigin(loop: Loop) {
         loop.origin = this.origin.minus(this.directionUnit().multi(loop.radius))
     }
@@ -160,10 +160,10 @@ class Line implements Elem {
     }
 
     center(): Vector {
-        return this.origin.add(this.to).multi(1/2)
+        return this.origin.add(this.to).multi(1 / 2)
     }
 
-    formalDistance(point:Vector): number {
+    formalDistance(point: Vector): number {
         let toLength = this.to.minus(point).length()
         let originLength = this.origin.minus(point).length()
         if (toLength < originLength) {
@@ -195,7 +195,7 @@ class Loop implements Elem {
     label: string = ""
     labels: LabelInfo[] = []
 
-    copy():Loop {
+    copy(): Loop {
         let loop = new Loop()
         loop.fill = this.fill
         loop.origin = this.origin
@@ -231,7 +231,7 @@ class Vertex extends Loop {
     radius = 0.3
 }
 
-function draw(elem: Elem, color:Color = "normal") {
+function draw(elem: Elem, color: Color = "normal") {
     if (elem.shape == "Line") {
         drawLine(elem as Line, color)
         return
@@ -253,7 +253,7 @@ function draw(elem: Elem, color:Color = "normal") {
 }
 
 type Color = "normal" | "select" | "sub"
-function getColor(color: Color) : string {
+function getColor(color: Color): string {
     if (color == "normal") {
         return 'rgb(0,0,0)'
     }
@@ -270,25 +270,67 @@ function getColor(color: Color) : string {
 }
 
 
-function drawLine(line: Line, color:Color = "normal") {
+function drawWaveLine(line: Line, color: Color = "normal") {
     const scale = config.scale
     context.beginPath()
-    context.moveTo(line.origin.x * scale, line.origin.y*scale)
-    context.lineTo(line.to.x*scale, line.to.y*scale)
-    // context.arc(100, 10, 50, 0, Math.PI * 2)
+
+    let origin = line.origin.multi(scale)
+    let lineto = line.to.multi(scale)
+    let unitVec = line.directionUnit()
+    let perpVec = unitVec.rotation(Math.PI / 2)
+
     context.strokeStyle = getColor(color)
+    // context.arc(100, 10, 50, 0, Math.PI * 2)
     if (line.style == "dash") {
-        context.setLineDash([2,2])
+        context.setLineDash([2, 2])
     } else {
         context.setLineDash([])
     }
-    context.stroke() 
+
+    context.moveTo(origin.x, origin.y)
+    for (let l = 0; l < line.length() * scale; l += 1) {
+        let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l) * 3
+        let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l) * 3
+        console.log(`draw ${l} ${x} ${y}`)
+        context.lineTo(x, y)
+        context.stroke()
+    }
+
     if (line.allow) {
         drawAllow(line)
     }
     if (line.label) {
         let diff = 1.0 + line.labelDiff
-        let pos = line.center().add(line.directionUnit().rotation(Math.PI/2).multi(diff))
+        let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff))
+        let position = textPosition(line.label, pos, config)
+        context.fillText(line.label, position.x * scale, position.y * scale)
+    }
+    context.closePath()
+}
+
+function drawLine(line: Line, color: Color = "normal") {
+    if (line.style == "wave") {
+        drawWaveLine(line, color)
+        return
+    }
+    const scale = config.scale
+    context.beginPath()
+    context.moveTo(line.origin.x * scale, line.origin.y * scale)
+    context.lineTo(line.to.x * scale, line.to.y * scale)
+    // context.arc(100, 10, 50, 0, Math.PI * 2)
+    context.strokeStyle = getColor(color)
+    if (line.style == "dash") {
+        context.setLineDash([2, 2])
+    } else {
+        context.setLineDash([])
+    }
+    context.stroke()
+    if (line.allow) {
+        drawAllow(line)
+    }
+    if (line.label) {
+        let diff = 1.0 + line.labelDiff
+        let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff))
         let position = textPosition(line.label, pos, config)
         context.fillText(line.label, position.x * scale, position.y * scale)
     }
@@ -298,8 +340,8 @@ function drawAllow(line: Line, color: Color = "normal") {
     const scale = config.scale
     let center = line.center()
     let front = center.add(line.directionUnit().multi(0.4))
-    let tail1 = center.minus(line.directionUnit().rotation(Math.PI/2).multi(0.4))
-    let tail2 = center.add(line.directionUnit().rotation(Math.PI/2).multi(0.4))
+    let tail1 = center.minus(line.directionUnit().rotation(Math.PI / 2).multi(0.4))
+    let tail2 = center.add(line.directionUnit().rotation(Math.PI / 2).multi(0.4))
     context.beginPath()
     context.strokeStyle = getColor(color)
     context.moveTo(front.x * scale, front.y * scale)
@@ -308,7 +350,7 @@ function drawAllow(line: Line, color: Color = "normal") {
     context.closePath()
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     context.fill()
-    context.stroke() 
+    context.stroke()
 }
 
 function drawLoop(loop: Loop, color: Color = "normal") {
@@ -335,10 +377,10 @@ function drawLoop(loop: Loop, color: Color = "normal") {
     if (loop.labels) {
         loop.labels.forEach((lab) => {
             const diff = 0.5 + lab.diff
-            let pos = loop.origin.add(new Vector(0, -1).multi(loop.radius+diff).rotation(lab.angle))
+            let pos = loop.origin.add(new Vector(0, -1).multi(loop.radius + diff).rotation(lab.angle))
             let position = textPosition(lab.label, pos, config)
             context.fillText(lab.label, position.x * scale, position.y * scale)
-        }) 
+        })
     }
 }
 
@@ -438,12 +480,12 @@ function draw2loop() {
     loop.labels = [
         { label: "p1", angle: 0, diff: 0 }
         , { label: "p2", angle: Math.PI, diff: 0 }
-        , { label: "p3", angle: Math.PI*3/2, diff: 0.3 }
+        , { label: "p3", angle: Math.PI * 3 / 2, diff: 0.3 }
     ]
     loop2.labels = [
-        { label: "q1", angle: 0 , diff : 0}
-        , { label: "q2", angle: Math.PI / 2, diff: 0}
-        , { label: "q3", angle: Math.PI, diff: 0}
+        { label: "q1", angle: 0, diff: 0 }
+        , { label: "q2", angle: Math.PI / 2, diff: 0 }
+        , { label: "q3", angle: Math.PI, diff: 0 }
     ]
 
     loop.addLineTo(exLine1)
@@ -461,7 +503,7 @@ function draw2loop() {
 function drawloop(n: number) {
     let exLines: Line[] = []
     for (let i = 0; i < 4; i++) {
-        exLines.push(new Line("k"+i))
+        exLines.push(new Line("k" + i))
     }
 }
 
@@ -499,7 +541,7 @@ function kakanzuTest() {
 // drawFourVertex()
 
 interface RepositoryCommand {
-    action(repo:RDRepository):void
+    action(repo: RDRepository): void
 }
 
 class SetVertex implements RepositoryCommand {
@@ -561,10 +603,10 @@ class RDRepository {
     lineList: Line[] = []
     currentIndex: number = 0
     currentSubIndex: number = 0
-    elements: Elem[] = [] 
-    selectCount:number = 0
+    elements: Elem[] = []
+    selectCount: number = 0
 
-    history:RepositoryCommand[] = []
+    history: RepositoryCommand[] = []
 
     currentElement(): Elem | undefined {
         if (this.currentIndex < this.elements.length) {
@@ -582,7 +624,7 @@ class RDRepository {
 
 
 
-    getVertex(x: number, y: number): Vector|undefined {
+    getVertex(x: number, y: number): Vector | undefined {
         const vec = this.vertex.get(`${x}_${y}`)
         return vec
     }
@@ -593,7 +635,7 @@ class RDRepository {
     }
 
     getAllVertex(): Vector[] {
-      return this.vertexList
+        return this.vertexList
     }
 
     getAllLoop(): Loop[] {
@@ -640,7 +682,7 @@ class RDRepository {
         this.vertex.set(`${vertex.x}_${vertex.y}`, vertex)
         this.vertexList.push(vertex)
         this.elements.push(vertex)
-        this.currentIndex = this.elements.length -1
+        this.currentIndex = this.elements.length - 1
     }
 
     setLoop(loop: Loop) {
@@ -666,7 +708,7 @@ class RDRepository {
 
     setMyString(str: MyString) {
         this.elements.push(str)
-        this.currentIndex = this.elements.length -1
+        this.currentIndex = this.elements.length - 1
     }
 
     nextElem() {
@@ -768,10 +810,11 @@ class RDDraw {
     canvas: HTMLCanvasElement
     context: CanvasRenderingContext2D
     isClick: boolean = false
-    clickIimeOutID?:number = undefined 
+    clickIimeOutID?: number = undefined
     prevX: number = 0
     prevY: number = 0
     stringMode?: string = undefined
+    isNoSelectMode:boolean = false
     constructor(canvas: HTMLCanvasElement) {
         this.canvas = canvas
         this.context = canvas.getContext("2d")!
@@ -796,7 +839,7 @@ class RDDraw {
     }
 
     click(ev: MouseEvent) {
-    
+
 
 
         const scale = config.scale
@@ -850,7 +893,7 @@ class RDDraw {
         // // context.stroke()
         // context.closePath()
         // console.log(`move:${ev.x}_${ev.y}`)
-      
+
         this.prevX = ev.x
         this.prevY = ev.y
     }
@@ -858,7 +901,7 @@ class RDDraw {
     keyPress(ev: KeyboardEvent) {
         console.log("key:" + ev.key)
         const scale = config.scale
-        const x = Math.floor(this.prevX / scale) 
+        const x = Math.floor(this.prevX / scale)
         const y = Math.floor(this.prevY / scale)
 
         if (this.stringMode != undefined) {
@@ -901,7 +944,7 @@ class RDDraw {
 
 
         if (ev.key == "v") {
-            this.putVertex(new Vector(x,y))
+            this.putVertex(new Vector(x, y))
         }
         if (ev.key == "n") {
             this.nextElem()
@@ -947,6 +990,15 @@ class RDDraw {
         if (ev.key == "c") {
             this.changeSelect()
         }
+
+        if (ev.key == "z") {
+            this.noSelectMode()
+        }
+    }
+
+    noSelectMode() {
+        this.isNoSelectMode = !this.isNoSelectMode
+        this.drawAll()
     }
 
     nextElem() {
@@ -976,10 +1028,10 @@ class RDDraw {
         this.drawAll()
     }
 
-    putLoop(x:number, y:number) {
+    putLoop(x: number, y: number) {
         console.log("put Loop..")
         const loop = new Loop()
-        loop.origin = new Vector(x,y)
+        loop.origin = new Vector(x, y)
         this.repository.doCommand(new SetLoop(loop))
         this.drawAll()
     }
@@ -987,7 +1039,7 @@ class RDDraw {
     drawAll() {
 
         // clear
-        context.clearRect(0,0, canvas.width, canvas.height)
+        context.clearRect(0, 0, canvas.width, canvas.height)
 
         const elms = this.repository.getAllElements()
         context.beginPath()
@@ -995,6 +1047,10 @@ class RDDraw {
             console.log("draw..")
             draw(elm)
         })
+
+        if (this.isNoSelectMode) {
+            return
+        }
 
         const sub = this.repository.currentSubElement()
         if (sub) {
@@ -1038,7 +1094,7 @@ class RDDraw {
             this.drawAll()
             return
         }
-        
+
         if (isVector(current) && isLoop(sub)) {
             let line = new Line()
             line.origin = current
@@ -1056,7 +1112,7 @@ class RDDraw {
             this.drawAll()
             return
         }
-        
+
     }
 
     allowToggle() {
@@ -1116,12 +1172,18 @@ class RDDraw {
                 return
             }
             if (elem.style == "dash") {
+                elem.style = "wave"
+                this.drawAll()
+                return
+            }
+            if (elem.style == "wave") {
                 elem.style = "normal"
                 this.drawAll()
                 return
             }
             this.drawAll()
             return
+
         }
         if (isLoop(elem)) {
             if (elem.style == "normal") {
@@ -1145,7 +1207,7 @@ class RDDraw {
         this.drawAll()
     }
 
-    select(point:Vector) {
+    select(point: Vector) {
         this.repository.select(point)
         this.drawAll()
     }

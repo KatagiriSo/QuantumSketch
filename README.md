@@ -38,5 +38,7 @@ s: next sub select (red)
 
 a: pre sub select (green)
 
+z: no select mode In/Out
+
 # LICENSE
 MIT

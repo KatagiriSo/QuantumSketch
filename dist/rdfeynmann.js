@@ -210,7 +210,45 @@ function getColor(color) {
     }
     return 'rgb(0,0,0)';
 }
+function drawWaveLine(line, color = "normal") {
+    const scale = config.scale;
+    context.beginPath();
+    let origin = line.origin.multi(scale);
+    let lineto = line.to.multi(scale);
+    let unitVec = line.directionUnit();
+    let perpVec = unitVec.rotation(Math.PI / 2);
+    context.strokeStyle = getColor(color);
+    // context.arc(100, 10, 50, 0, Math.PI * 2)
+    if (line.style == "dash") {
+        context.setLineDash([2, 2]);
+    }
+    else {
+        context.setLineDash([]);
+    }
+    context.moveTo(origin.x, origin.y);
+    for (let l = 0; l < line.length() * scale; l += 1) {
+        let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l) * 3;
+        let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l) * 3;
+        console.log(`draw ${l} ${x} ${y}`);
+        context.lineTo(x, y);
+        context.stroke();
+    }
+    if (line.allow) {
+        drawAllow(line);
+    }
+    if (line.label) {
+        let diff = 1.0 + line.labelDiff;
+        let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff));
+        let position = textPosition(line.label, pos, config);
+        context.fillText(line.label, position.x * scale, position.y * scale);
+    }
+    context.closePath();
+}
 function drawLine(line, color = "normal") {
+    if (line.style == "wave") {
+        drawWaveLine(line, color);
+        return;
+    }
     const scale = config.scale;
     context.beginPath();
     context.moveTo(line.origin.x * scale, line.origin.y * scale);
@@ -635,6 +673,7 @@ class RDDraw {
         this.prevX = 0;
         this.prevY = 0;
         this.stringMode = undefined;
+        this.isNoSelectMode = false;
         this.canvas = canvas;
         this.context = canvas.getContext("2d");
         this.bind();
@@ -773,6 +812,13 @@ class RDDraw {
         if (ev.key == "c") {
             this.changeSelect();
         }
+        if (ev.key == "z") {
+            this.noSelectMode();
+        }
+    }
+    noSelectMode() {
+        this.isNoSelectMode = !this.isNoSelectMode;
+        this.drawAll();
     }
     nextElem() {
         this.repository.nextElem();
@@ -811,6 +857,9 @@ class RDDraw {
             console.log("draw..");
             draw(elm);
         });
+        if (this.isNoSelectMode) {
+            return;
+        }
         const sub = this.repository.currentSubElement();
         if (sub) {
             draw(sub, "sub");
@@ -922,6 +971,11 @@ class RDDraw {
                 return;
             }
             if (elem.style == "dash") {
+                elem.style = "wave";
+                this.drawAll();
+                return;
+            }
+            if (elem.style == "wave") {
                 elem.style = "normal";
                 this.drawAll();
                 return;
