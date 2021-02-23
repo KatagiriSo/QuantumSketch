@@ -796,7 +796,7 @@ class RDDraw {
         const x = Math.floor(this.prevX / scale);
         const y = Math.floor(this.prevY / scale);
         if (this.stringMode != undefined) {
-            if (ev.key == "/") {
+            if (ev.key == "/" || ev.key == "Enter") {
                 // let current = this.repository.currentElement()
                 // if (current && isLine(current)) {
                 //     current.label = this.stringMode
