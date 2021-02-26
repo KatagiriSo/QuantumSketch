@@ -59,5 +59,7 @@ w: scale up
 
 x: scale down
 
+e: export tikz text (console.log...)
+
 # LICENSE
 MIT
