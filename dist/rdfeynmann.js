@@ -2,7 +2,92 @@
 const x = "hello typescript";
 console.log(x);
 let canvas = document.getElementById("canvas");
-let context = canvas.getContext("2d");
+let context_ = canvas.getContext("2d");
+class DrawContext {
+    constructor(context) {
+        this.exportType = "canvas";
+        this.exportString = "";
+        this.dashStyle = [];
+        this.coordinate = new Vector(0, 0);
+        this.scale = config.scale;
+        this.canvasContext = context;
+    }
+    setStrokeColor(color) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.strokeStyle = getColor(color);
+            return;
+        }
+    }
+    setFillColor(color) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.fillStyle = getColor(color);
+            return;
+        }
+    }
+    setExportType(exportType) {
+        this.exportType = exportType;
+        if (exportType == "canvas") {
+            this.scale = config.scale;
+        }
+        if (exportType == "tikz") {
+            this.scale = config.scale / config.scale;
+        }
+    }
+    beginPath() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.beginPath();
+            return;
+        }
+    }
+    moveTo(x, y) {
+        this.coordinate = new Vector(x, y);
+    }
+    closePath() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.closePath();
+            return;
+        }
+    }
+    setLineDash(dash) {
+        this.dashStyle = dash;
+    }
+    lineTo(x, y) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.setLineDash(this.dashStyle);
+            this.canvasContext.moveTo(this.coordinate.x * this.scale, this.coordinate.y * this.scale);
+            this.canvasContext.lineTo(x * this.scale, y * this.scale);
+            return;
+        }
+    }
+    fill() {
+    }
+    fillRect(x, y, w, h) {
+        if (this.exportType == "canvas") {
+            console.log(`fillRect${x} ${y} ${w} ${h}`);
+            this.canvasContext.fillRect(x * this.scale, y * this.scale, w * this.scale, h * this.scale);
+        }
+    }
+    clearRect() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+        }
+    }
+    stroke() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.stroke();
+        }
+    }
+    fillText(txt, x, y) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.fillText(txt, x * this.scale, y * this.scale);
+        }
+    }
+    arc(x, y, radius, startAngle, endAngle) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle);
+        }
+    }
+}
 let config = {
     /// lattice size
     scale: 15
@@ -12,8 +97,7 @@ function direction(v1, v2) {
 }
 function textPosition(text, position, config) {
     //TODO
-    let scale = config.scale;
-    return position.add(new Vector(-3 / scale, +3 / scale)); // font 仮定
+    return position.add(new Vector(-3, +3)); // font 仮定
 }
 function isVector(elem) {
     return elem.shape == "Point";
@@ -195,21 +279,21 @@ class Vertex extends Loop {
         this.radius = 0.3;
     }
 }
-function draw(elem, color = "normal") {
+function draw(elem, exportType, color = "normal") {
     if (elem.shape == "Line") {
-        drawLine(elem, color);
+        drawLine(elem, exportType, color);
         return;
     }
     if (elem.shape == "Loop") {
-        drawLoop(elem, color);
+        drawLoop(elem, exportType, color);
         return;
     }
     if (elem.shape == "Point") {
-        drawPoint(elem, color);
+        drawPoint(elem, exportType, color);
         return;
     }
     if (elem.shape == "String") {
-        drawText(elem, color);
+        drawText(elem, exportType, color);
         return;
     }
 }
@@ -225,131 +309,125 @@ function getColor(color) {
     }
     return 'rgb(0,0,0)';
 }
-function drawWaveLine(line, color = "normal") {
-    const scale = config.scale;
-    context.beginPath();
-    let origin = line.origin.multi(scale);
-    let lineto = line.to.multi(scale);
+function drawWaveLine(line, exportType, color = "normal") {
+    drawContext.beginPath();
+    let origin = line.origin;
+    let lineto = line.to;
     let unitVec = line.directionUnit();
     let perpVec = unitVec.rotation(Math.PI / 2);
-    context.strokeStyle = getColor(color);
+    drawContext.setStrokeColor(color);
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     if (line.style == "dash") {
-        context.setLineDash([2, 2]);
+        drawContext.setLineDash([2, 2]);
     }
     else {
-        context.setLineDash([]);
+        drawContext.setLineDash([]);
     }
-    context.moveTo(origin.x, origin.y);
-    for (let l = 0; l < line.length() * scale; l += 1) {
+    drawContext.moveTo(origin.x, origin.y);
+    for (let l = 0; l < line.length(); l += 0.1) {
         let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l) * 3;
         let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l) * 3;
         console.log(`draw ${l} ${x} ${y}`);
-        context.lineTo(x, y);
-        context.stroke();
+        drawContext.lineTo(x, y);
+        drawContext.stroke();
     }
     if (line.allow) {
-        drawAllow(line);
+        drawAllow(line, exportType);
     }
     if (line.label) {
         let diff = 1.0 + line.labelDiff;
         let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff));
         let position = textPosition(line.label, pos, config);
-        context.fillText(line.label, position.x * scale, position.y * scale);
+        drawContext.fillText(line.label, position.x, position.y);
     }
-    context.closePath();
+    drawContext.closePath();
 }
-function drawLine(line, color = "normal") {
+function drawLine(line, exportType, color = "normal") {
     if (line.style == "wave") {
-        drawWaveLine(line, color);
+        drawWaveLine(line, exportType, color);
         return;
     }
-    const scale = config.scale;
-    context.beginPath();
-    context.moveTo(line.origin.x * scale, line.origin.y * scale);
-    context.lineTo(line.to.x * scale, line.to.y * scale);
+    drawContext.beginPath();
+    drawContext.moveTo(line.origin.x, line.origin.y);
+    drawContext.lineTo(line.to.x, line.to.y);
     // context.arc(100, 10, 50, 0, Math.PI * 2)
-    context.strokeStyle = getColor(color);
+    drawContext.setStrokeColor(color);
     if (line.style == "dash") {
-        context.setLineDash([2, 2]);
+        drawContext.setLineDash([2, 2]);
     }
     else {
-        context.setLineDash([]);
+        drawContext.setLineDash([]);
     }
-    context.stroke();
+    drawContext.stroke();
     if (line.allow) {
-        drawAllow(line);
+        drawAllow(line, exportType);
     }
     if (line.label) {
         let diff = 1.0 + line.labelDiff;
         let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff));
         let position = textPosition(line.label, pos, config);
-        context.fillText(line.label, position.x * scale, position.y * scale);
+        drawContext.fillText(line.label, position.x, position.y);
     }
 }
-function drawAllow(line, color = "normal") {
-    const scale = config.scale;
+function drawAllow(line, exportType, color = "normal") {
     let center = line.center();
     let front = center.add(line.directionUnit().multi(0.4));
     let tail1 = center.minus(line.directionUnit().rotation(Math.PI / 2).multi(0.4));
     let tail2 = center.add(line.directionUnit().rotation(Math.PI / 2).multi(0.4));
-    context.beginPath();
-    context.strokeStyle = getColor(color);
-    context.moveTo(front.x * scale, front.y * scale);
-    context.lineTo(tail1.x * scale, tail1.y * scale);
-    context.lineTo(tail2.x * scale, tail2.y * scale);
-    context.closePath();
+    drawContext.beginPath();
+    drawContext.setStrokeColor(color);
+    drawContext.moveTo(front.x, front.y);
+    drawContext.lineTo(tail1.x, tail1.y);
+    drawContext.lineTo(tail2.x, tail2.y);
+    drawContext.closePath();
     // context.arc(100, 10, 50, 0, Math.PI * 2)
-    context.fill();
-    context.stroke();
+    drawContext.fill();
+    drawContext.stroke();
 }
-function drawLoop(loop, color = "normal") {
-    const scale = config.scale;
-    context.beginPath();
-    context.strokeStyle = getColor(color);
+function drawLoop(loop, exportType, color = "normal") {
+    drawContext.beginPath();
+    drawContext.setStrokeColor(color);
     if (loop.style == "dash") {
-        context.setLineDash([2, 2]);
+        drawContext.setLineDash([2, 2]);
     }
     else {
-        context.setLineDash([]);
+        drawContext.setLineDash([]);
     }
-    context.arc(loop.origin.x * scale, loop.origin.y * scale, loop.radius * scale, 0, Math.PI * 2);
-    context.stroke();
+    drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, 0, Math.PI * 2);
+    drawContext.stroke();
     if (loop.fill) {
-        context.fill();
+        drawContext.fill();
     }
     if (loop.label) {
         let position = textPosition(loop.label, loop.origin, config);
-        context.fillText(loop.label, position.x * scale, position.y * scale);
+        drawContext.fillText(loop.label, position.x, position.y);
     }
     if (loop.labels) {
         loop.labels.forEach((lab) => {
             const diff = 0.5 + lab.diff;
             let pos = loop.origin.add(new Vector(0, -1).multi(loop.radius + diff).rotation(lab.angle));
             let position = textPosition(lab.label, pos, config);
-            context.fillText(lab.label, position.x * scale, position.y * scale);
+            drawContext.fillText(lab.label, position.x, position.y);
         });
     }
 }
-function drawPoint(point, color = "normal") {
-    const scale = config.scale;
-    const x = point.x * scale;
-    const y = point.y * scale;
-    context.beginPath();
-    context.fillStyle = getColor(color);
+function drawPoint(point, exportType, color = "normal") {
+    const x = point.x;
+    const y = point.y;
+    drawContext.beginPath();
+    drawContext.setFillColor(color);
     console.log(`drawPoint ${x}_${y}, ${getColor(color)}`);
-    context.fillRect(x - 1, y - 1, 3, 3);
-    context.closePath();
+    drawContext.fillRect(x - 1 / 15, y - 1 / 15, 3 / 15, 3 / 15);
+    drawContext.closePath();
 }
-function drawText(str, color = "normal") {
-    const scale = config.scale;
-    const x = str.origin.x * scale;
-    const y = str.origin.y * scale;
-    context.beginPath();
-    context.fillStyle = getColor(color);
-    context.fillText(str.label, x, y);
+function drawText(str, exportType, color = "normal") {
+    const x = str.origin.x;
+    const y = str.origin.y;
+    drawContext.beginPath();
+    drawContext.setFillColor(color);
+    drawContext.fillText(str.label, x, y);
     console.log(`drawText ${x}_${y}, ${getColor(color)}`);
-    context.closePath();
+    drawContext.closePath();
 }
 // function drawVertex(loop: Vertex) {
 //     const scale = config.scale
@@ -396,7 +474,7 @@ function drawFourVertex() {
     vertex.addLineOrigin(exLine2);
     vertex.addLineOrigin(exLine4);
     elems.forEach((x) => {
-        draw(x);
+        draw(x, "canvas");
     });
 }
 /// example
@@ -431,7 +509,7 @@ function draw2loop() {
     loop2.addLineOrigin(exLine4);
     intLine.between(loop2, loop);
     elems.forEach((x) => {
-        draw(x);
+        draw(x, "canvas");
     });
 }
 /// example
@@ -461,7 +539,7 @@ function kakanzuTest() {
     line3.between(loop00, loop10);
     line4.between(loop10, loop11);
     elems.forEach((x) => {
-        draw(x);
+        draw(x, "canvas");
     });
 }
 class SetVertex {
@@ -946,27 +1024,31 @@ class RDDraw {
         this.repository.doCommand(new SetLoop(loop));
         this.drawAll();
     }
-    drawAll() {
+    drawAll(exportType = "canvas") {
+        drawContext.setExportType(exportType);
         // clear
-        context.clearRect(0, 0, canvas.width, canvas.height);
+        drawContext.clearRect();
         const elms = this.repository.getAllElements();
-        context.beginPath();
+        drawContext.beginPath();
         elms.forEach((elm, index) => {
             console.log("draw..");
-            draw(elm);
+            draw(elm, exportType);
         });
         if (this.isNoSelectMode) {
             return;
         }
+        if (exportType != "canvas") {
+            return;
+        }
         const sub = this.repository.currentSubElement();
         if (sub) {
-            draw(sub, "sub");
+            draw(sub, "canvas", "sub");
         }
         const current = this.repository.currentElement();
         if (current) {
-            draw(current, "select");
+            draw(current, "canvas", "select");
         }
-        context.closePath();
+        drawContext.closePath();
     }
     putLine() {
         let current = this.repository.currentElement();
@@ -1151,3 +1233,4 @@ class RDDraw {
     }
 }
 const h = new RDDraw(canvas);
+let drawContext = new DrawContext(context_);

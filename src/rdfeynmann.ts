@@ -2,13 +2,127 @@ const x: string = "hello typescript"
 console.log(x)
 
 let canvas = document.getElementById("canvas") as HTMLCanvasElement
-let context = canvas.getContext("2d")!
+let context_ = canvas.getContext("2d")!
+
+
+class DrawContext {
+    private exportType:ExportType = "canvas"
+    private canvasContext: CanvasRenderingContext2D
+    private exportString: string = ""
+    private dashStyle: number[] = []
+    private coordinate: Vector = new Vector(0, 0)
+    private scale: number = config.scale
+    constructor(context: CanvasRenderingContext2D) {
+        this.canvasContext = context
+    }
+
+    setStrokeColor(color: Color) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.strokeStyle = getColor(color)
+            return
+        }
+    }
+
+    setFillColor(color: Color) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.fillStyle = getColor(color)
+            return
+        }
+    }
+
+
+    setExportType(exportType: ExportType) {
+        this.exportType = exportType
+        if (exportType == "canvas") {
+            this.scale = config.scale
+        }
+        if (exportType == "tikz") {
+            this.scale = config.scale / config.scale
+        }
+    }
+    
+
+    beginPath() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.beginPath()
+            return
+        }
+    }
+
+    moveTo(x:number, y:number) {
+        this.coordinate = new Vector(x, y)
+    }
+
+    closePath() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.closePath()
+            return
+        }
+    }
+
+    setLineDash(dash: number[]) {
+        this.dashStyle = dash
+    }
+
+    lineTo(x: number, y: number) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.setLineDash(this.dashStyle)
+            this.canvasContext.moveTo(this.coordinate.x * this.scale, this.coordinate.y * this.scale)
+            this.canvasContext.lineTo(x * this.scale, y * this.scale)
+            return
+        }
+    }
+
+    fill() {
+
+    }
+
+    fillRect(x:number,y:number,w:number,h:number) {
+        if (this.exportType == "canvas") {
+            console.log(`fillRect${x} ${y} ${w} ${h}`)
+            this.canvasContext.fillRect(x * this.scale, y * this.scale, w * this.scale, h * this.scale)
+        }
+    }
+
+    clearRect() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.clearRect(0, 0, canvas.width, canvas.height)
+        }
+    }
+
+
+
+    stroke() {
+        if (this.exportType == "canvas") {
+            this.canvasContext.stroke()
+        }
+
+    }
+
+    fillText(txt: string, x: number, y: number) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.fillText(txt, x * this.scale, y * this.scale)
+        }
+    }
+
+    arc(x: number, y: number, radius: number, startAngle: number, endAngle: number) {
+        if (this.exportType == "canvas") {
+            this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale,  startAngle, endAngle)
+        }
+    }
+
+
+}
+
+
 
 interface Config {
     scale: number
 }
 
 type Shape = "Line" | "Loop" | "Point" | "String" 
+
+type ExportType = "tikz"|"canvas"
 
 interface Elem {
     shape: Shape
@@ -27,8 +141,7 @@ function direction(v1: Vector, v2: Vector): Vector {
 
 function textPosition(text: string, position: Vector, config: Config) {
     //TODO
-    let scale = config.scale
-    return position.add(new Vector(-3 / scale, +3 / scale))// font 仮定
+    return position.add(new Vector(-3, +3))// font 仮定
 
 }
 
@@ -245,6 +358,8 @@ class Loop implements Elem {
         return this.origin.minus(point).length()
     }
 
+
+
 }
 
 class Vertex extends Loop {
@@ -252,23 +367,23 @@ class Vertex extends Loop {
     radius = 0.3
 }
 
-function draw(elem: Elem, color: Color = "normal") {
+function draw(elem: Elem, exportType:ExportType, color: Color = "normal") {
     if (elem.shape == "Line") {
-        drawLine(elem as Line, color)
+        drawLine(elem as Line, exportType, color)
         return
     }
     if (elem.shape == "Loop") {
-        drawLoop(elem as Loop, color)
+        drawLoop(elem as Loop, exportType, color)
         return
     }
 
     if (elem.shape == "Point") {
-        drawPoint(elem as Vector, color)
+        drawPoint(elem as Vector, exportType, color)
         return
     }
 
     if (elem.shape == "String") {
-        drawText(elem as MyString, color)
+        drawText(elem as MyString, exportType, color)
         return
     }
 }
@@ -291,108 +406,106 @@ function getColor(color: Color): string {
 }
 
 
-function drawWaveLine(line: Line, color: Color = "normal") {
-    const scale = config.scale
-    context.beginPath()
+function drawWaveLine(line: Line, exportType: ExportType, color: Color = "normal") {
+    drawContext.beginPath()
 
-    let origin = line.origin.multi(scale)
-    let lineto = line.to.multi(scale)
+    let origin = line.origin
+    let lineto = line.to
     let unitVec = line.directionUnit()
     let perpVec = unitVec.rotation(Math.PI / 2)
 
-    context.strokeStyle = getColor(color)
+    drawContext.setStrokeColor(color)
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     if (line.style == "dash") {
-        context.setLineDash([2, 2])
+        drawContext.setLineDash([2, 2])
     } else {
-        context.setLineDash([])
+        drawContext.setLineDash([])
     }
 
-    context.moveTo(origin.x, origin.y)
-    for (let l = 0; l < line.length() * scale; l += 1) {
+    drawContext.moveTo(origin.x, origin.y)
+    for (let l = 0; l < line.length(); l += 0.1) {
         let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l) * 3
         let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l) * 3
         console.log(`draw ${l} ${x} ${y}`)
-        context.lineTo(x, y)
-        context.stroke()
+        drawContext.lineTo(x, y)
+        drawContext.stroke()
     }
 
     if (line.allow) {
-        drawAllow(line)
+        drawAllow(line, exportType)
     }
     if (line.label) {
         let diff = 1.0 + line.labelDiff
         let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff))
         let position = textPosition(line.label, pos, config)
-        context.fillText(line.label, position.x * scale, position.y * scale)
+        drawContext.fillText(line.label, position.x, position.y)
     }
-    context.closePath()
+    drawContext.closePath()
 }
 
-function drawLine(line: Line, color: Color = "normal") {
+
+function drawLine(line: Line, exportType:ExportType, color: Color = "normal") {
     if (line.style == "wave") {
-        drawWaveLine(line, color)
+        drawWaveLine(line, exportType, color)
         return
     }
-    const scale = config.scale
-    context.beginPath()
-    context.moveTo(line.origin.x * scale, line.origin.y * scale)
-    context.lineTo(line.to.x * scale, line.to.y * scale)
+
+    drawContext.beginPath()
+    drawContext.moveTo(line.origin.x, line.origin.y)
+    drawContext.lineTo(line.to.x, line.to.y)
     // context.arc(100, 10, 50, 0, Math.PI * 2)
-    context.strokeStyle = getColor(color)
+    drawContext.setStrokeColor(color)
     if (line.style == "dash") {
-        context.setLineDash([2, 2])
+        drawContext.setLineDash([2,2])
     } else {
-        context.setLineDash([])
+        drawContext.setLineDash([])
     }
-    context.stroke()
+    drawContext.stroke()
     if (line.allow) {
-        drawAllow(line)
+        drawAllow(line, exportType)
     }
     if (line.label) {
         let diff = 1.0 + line.labelDiff
         let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff))
         let position = textPosition(line.label, pos, config)
-        context.fillText(line.label, position.x * scale, position.y * scale)
+        drawContext.fillText(line.label, position.x, position.y)
     }
 }
 
-function drawAllow(line: Line, color: Color = "normal") {
-    const scale = config.scale
+function drawAllow(line: Line, exportType: ExportType,  color: Color = "normal") {
     let center = line.center()
     let front = center.add(line.directionUnit().multi(0.4))
     let tail1 = center.minus(line.directionUnit().rotation(Math.PI / 2).multi(0.4))
     let tail2 = center.add(line.directionUnit().rotation(Math.PI / 2).multi(0.4))
-    context.beginPath()
-    context.strokeStyle = getColor(color)
-    context.moveTo(front.x * scale, front.y * scale)
-    context.lineTo(tail1.x * scale, tail1.y * scale)
-    context.lineTo(tail2.x * scale, tail2.y * scale)
-    context.closePath()
+    drawContext.beginPath()
+    drawContext.setStrokeColor(color)
+    drawContext.moveTo(front.x, front.y)
+    drawContext.lineTo(tail1.x, tail1.y)
+    drawContext.lineTo(tail2.x, tail2.y)
+    drawContext.closePath()
     // context.arc(100, 10, 50, 0, Math.PI * 2)
-    context.fill()
-    context.stroke()
+    drawContext.fill()
+    drawContext.stroke()
 }
 
-function drawLoop(loop: Loop, color: Color = "normal") {
-    const scale = config.scale
-    context.beginPath()
-    context.strokeStyle = getColor(color)
+function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
+    drawContext.beginPath()
+    drawContext.setStrokeColor(color)
     if (loop.style == "dash") {
-        context.setLineDash([2, 2])
+        drawContext.setLineDash([2, 2])
     } else {
-        context.setLineDash([])
+        drawContext.setLineDash([])
     }
-    context.arc(loop.origin.x * scale,
-        loop.origin.y * scale,
-        loop.radius * scale, 0, Math.PI * 2)
-    context.stroke()
+    drawContext.arc(loop.origin.x,
+        loop.origin.y,
+        loop.radius, 0, Math.PI * 2)
+    drawContext.stroke()
     if (loop.fill) {
-        context.fill()
+        drawContext.fill()
     }
     if (loop.label) {
         let position = textPosition(loop.label, loop.origin, config)
-        context.fillText(loop.label, position.x * scale, position.y * scale)
+        drawContext.fillText(loop.label, position.x, position.y)
     }
 
     if (loop.labels) {
@@ -400,31 +513,30 @@ function drawLoop(loop: Loop, color: Color = "normal") {
             const diff = 0.5 + lab.diff
             let pos = loop.origin.add(new Vector(0, -1).multi(loop.radius + diff).rotation(lab.angle))
             let position = textPosition(lab.label, pos, config)
-            context.fillText(lab.label, position.x * scale, position.y * scale)
+            drawContext.fillText(lab.label, position.x, position.y)
         })
     }
 }
 
-function drawPoint(point: Vector, color: Color = "normal") {
-    const scale = config.scale
-    const x = point.x * scale
-    const y = point.y * scale
-    context.beginPath()
-    context.fillStyle = getColor(color)
+function drawPoint(point: Vector, exportType: ExportType,  color: Color = "normal") {
+    const x = point.x
+    const y = point.y 
+    drawContext.beginPath()
+    drawContext.setFillColor(color)
     console.log(`drawPoint ${x}_${y}, ${getColor(color)}`)
-    context.fillRect(x - 1, y - 1, 3, 3)
-    context.closePath()
+    drawContext.fillRect(x - 1/15, y - 1/15, 3/15, 3/15)
+    drawContext.closePath()
 }
 
-function drawText(str: MyString, color: Color = "normal") {
-    const scale = config.scale
-    const x = str.origin.x * scale
-    const y = str.origin.y * scale
-    context.beginPath()
-    context.fillStyle = getColor(color)
-    context.fillText(str.label, x, y)
+function drawText(str: MyString, exportType: ExportType, color: Color = "normal") {
+    const x = str.origin.x
+    const y = str.origin.y
+    drawContext.beginPath()
+
+    drawContext.setFillColor(color)
+    drawContext.fillText(str.label, x, y)
     console.log(`drawText ${x}_${y}, ${getColor(color)}`)
-    context.closePath()
+    drawContext.closePath()
 }
 
 // function drawVertex(loop: Vertex) {
@@ -477,7 +589,7 @@ function drawFourVertex() {
     vertex.addLineOrigin(exLine4)
 
     elems.forEach((x) => {
-        draw(x)
+        draw(x, "canvas")
     })
 }
 
@@ -516,7 +628,7 @@ function draw2loop() {
     intLine.between(loop2, loop)
 
     elems.forEach((x) => {
-        draw(x)
+        draw(x, "canvas")
     })
 }
 
@@ -553,7 +665,7 @@ function kakanzuTest() {
     line4.between(loop10, loop11)
 
     elems.forEach((x) => {
-        draw(x)
+        draw(x, "canvas")
     })
 }
 
@@ -900,9 +1012,6 @@ class RDDraw {
     }
 
     click(ev: MouseEvent) {
-
-
-
         const scale = config.scale
         const x = Math.floor(this.prevX / scale)
         const y = Math.floor(this.prevY / scale)
@@ -1152,32 +1261,40 @@ class RDDraw {
         this.drawAll()
     }
 
-    drawAll() {
+    
+
+    drawAll(exportType: ExportType = "canvas") {
+        
+        drawContext.setExportType(exportType)
 
         // clear
-        context.clearRect(0, 0, canvas.width, canvas.height)
+        drawContext.clearRect()
 
         const elms = this.repository.getAllElements()
-        context.beginPath()
+        drawContext.beginPath()
         elms.forEach((elm, index) => {
             console.log("draw..")
-            draw(elm)
+            draw(elm, exportType)
         })
 
         if (this.isNoSelectMode) {
             return
         }
 
+        if (exportType != "canvas") {
+            return
+        }
+
         const sub = this.repository.currentSubElement()
         if (sub) {
-            draw(sub, "sub")
+            draw(sub, "canvas", "sub")
         }
 
         const current = this.repository.currentElement()
         if (current) {
-            draw(current, "select")
+            draw(current, "canvas", "select")
         }
-        context.closePath()
+        drawContext.closePath()
     }
 
     putLine() {
@@ -1378,3 +1495,5 @@ class RDDraw {
 }
 
 const h = new RDDraw(canvas)
+let drawContext = new DrawContext(context_)
+
