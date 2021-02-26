@@ -134,16 +134,23 @@ class DrawContext {
     }
 
     startExport() {
-        this.addExport("\\newcommand{\\myDiagram}{")
-        this.addExport("\\begin{tikzpicture}\n")
+        if (this.exportType == "tikz") {
+            this.addExport("\\newcommand{\\myDiagram}{")
+            this.addExport("\\begin{tikzpicture}\n")
+        }
     }
 
     endExport() {
-        this.addExport("\\end{tikzpicture}\n ")
-        this.addExport("}\n ")
+        if (this.exportType == "tikz") {
+            this.addExport("\\end{tikzpicture}\n ")
+            this.addExport("}\n ")
 
-        console.log(this.exportString)
-        this.exportString = ""
+            let selector = document.querySelector("div#output") as HTMLElement
+            selector.textContent = this.exportString
+
+            console.log(this.exportString)
+            this.exportString = ""
+        }
     }
 
 
@@ -459,10 +466,11 @@ function drawWaveLine(line: Line, exportType: ExportType, color: Color = "normal
 
     drawContext.moveTo(origin.x, origin.y)
     for (let l = 0; l < line.length(); l += 0.1) {
-        let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l) * 3
-        let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l) * 3
+        let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l*5) * 3/15
+        let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l*5) * 3/15
         console.log(`draw ${l} ${x} ${y}`)
         drawContext.lineTo(x, y)
+        drawContext.moveTo(x, y)
         drawContext.stroke()
     }
 
