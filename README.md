@@ -13,7 +13,7 @@ This is a Feynmann Diagram editor.
 
 # Usage
 
-Open main.html in your browser.
+Open index.html in your browser.
 
 # Operation Rule
 
