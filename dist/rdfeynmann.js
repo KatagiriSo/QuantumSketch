@@ -30,7 +30,7 @@ class DrawContext {
             this.scale = config.scale;
         }
         if (exportType == "tikz") {
-            this.scale = config.scale / config.scale;
+            this.scale = (config.scale / config.scale);
         }
     }
     beginPath() {
@@ -109,7 +109,7 @@ class DrawContext {
     startExport() {
         if (this.exportType == "tikz") {
             this.addExport("\\newcommand{\\myDiagram}{");
-            this.addExport("\\begin{tikzpicture}\n");
+            this.addExport("\\begin{tikzpicture}[scale=0.1]\n");
         }
     }
     endExport() {
