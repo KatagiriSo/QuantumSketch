@@ -51,11 +51,18 @@ class DrawContext {
     setLineDash(dash) {
         this.dashStyle = dash;
     }
+    addExport(txt) {
+        this.exportString += txt;
+    }
     lineTo(x, y) {
         if (this.exportType == "canvas") {
             this.canvasContext.setLineDash(this.dashStyle);
             this.canvasContext.moveTo(this.coordinate.x * this.scale, this.coordinate.y * this.scale);
             this.canvasContext.lineTo(x * this.scale, y * this.scale);
+            return;
+        }
+        if (this.exportType == "tikz") {
+            this.addExport(`\\draw (${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`);
             return;
         }
     }
@@ -65,27 +72,49 @@ class DrawContext {
         if (this.exportType == "canvas") {
             console.log(`fillRect${x} ${y} ${w} ${h}`);
             this.canvasContext.fillRect(x * this.scale, y * this.scale, w * this.scale, h * this.scale);
+            return;
         }
     }
     clearRect() {
         if (this.exportType == "canvas") {
             this.canvasContext.clearRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
+        if (this.exportType == "tikz") {
+            this.exportString = "";
         }
     }
     stroke() {
         if (this.exportType == "canvas") {
             this.canvasContext.stroke();
+            return;
         }
     }
     fillText(txt, x, y) {
         if (this.exportType == "canvas") {
             this.canvasContext.fillText(txt, x * this.scale, y * this.scale);
+            return;
         }
     }
     arc(x, y, radius, startAngle, endAngle) {
         if (this.exportType == "canvas") {
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle);
+            return;
         }
+        if (this.exportType == "tikz") {
+            this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`);
+            return;
+        }
+    }
+    startExport() {
+        this.addExport("\\newcommand{\\myDiagram}{");
+        this.addExport("\\begin{tikzpicture}\n");
+    }
+    endExport() {
+        this.addExport("\\end{tikzpicture}\n ");
+        this.addExport("}\n ");
+        console.log(this.exportString);
+        this.exportString = "";
     }
 }
 let config = {
@@ -907,6 +936,9 @@ class RDDraw {
             this.stringMode = "";
             return;
         }
+        if (ev.key == "e") {
+            this.drawAll("tikz");
+        }
         if (ev.key == "v") {
             this.putVertex(new Vector(x, y));
         }
@@ -1028,12 +1060,14 @@ class RDDraw {
         drawContext.setExportType(exportType);
         // clear
         drawContext.clearRect();
+        drawContext.startExport();
         const elms = this.repository.getAllElements();
         drawContext.beginPath();
         elms.forEach((elm, index) => {
             console.log("draw..");
             draw(elm, exportType);
         });
+        drawContext.endExport();
         if (this.isNoSelectMode) {
             return;
         }
