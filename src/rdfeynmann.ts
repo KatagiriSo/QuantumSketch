@@ -1,8 +1,38 @@
-const x: string = "RDFeynmann v0.2  So Katagiri"
+const x: string = "RDFeynmann  So Katagiri"
 console.log(x)
 
 let canvas = document.getElementById("canvas") as HTMLCanvasElement
 let context_ = canvas.getContext("2d")!
+
+interface Config {
+    scale: number
+    log: "ON"|"OFF"|"VER"
+}
+
+let config: Config = {
+    /// lattice size
+    scale: 15,
+    log: "ON"
+}
+
+function loggerVer(text: string) {
+    if (config.log == "VER") {
+        console.log(text)
+    }
+}
+
+function loggerOn(text: string) {
+    if (config.log == "ON"||config.log == "VER") {
+        console.log(text)
+    }
+}
+
+let elemIDCounter = 0
+function getElemID(): string {
+    let id = `${elemIDCounter}`
+    elemIDCounter++
+    return id
+}
 
 
 class DrawContext {
@@ -15,6 +45,23 @@ class DrawContext {
     constructor(context: CanvasRenderingContext2D) {
         this.canvasContext = context
     }
+
+    output(desc: string, exportType: "html", id: "sub" | "current") {
+        if (this.exportType == "canvas") {
+            if (id == "sub") {
+                let selector = document.querySelector("div#sub") as HTMLElement
+                selector.textContent = desc
+                return
+            }
+            if (id == "current") {
+                let selector = document.querySelector("div#current") as HTMLElement
+                selector.textContent = desc
+                return
+            }
+
+        }
+    }
+
 
     setStrokeColor(color: Color) {
         if (this.exportType == "canvas") {
@@ -61,6 +108,7 @@ class DrawContext {
     }
 
     setLineDash(dash: number[]) {
+        loggerOn("setLineDash:"+dash)
         this.dashStyle = dash
     }
 
@@ -88,7 +136,7 @@ class DrawContext {
 
     fillRect(x:number,y:number,w:number,h:number) {
         if (this.exportType == "canvas") {
-            console.log(`fillRect${x} ${y} ${w} ${h}`)
+            loggerVer(`fillRect${x} ${y} ${w} ${h}`)
             this.canvasContext.fillRect(x * this.scale, y * this.scale, w * this.scale, h * this.scale)
             return
         }
@@ -123,6 +171,7 @@ class DrawContext {
 
     arc(x: number, y: number, radius: number, startAngle: number, endAngle: number) {
         if (this.exportType == "canvas") {
+            this.canvasContext.setLineDash(this.dashStyle)
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle)
             return
         }
@@ -154,7 +203,7 @@ class DrawContext {
             let selector = document.querySelector("div#output") as HTMLElement
             selector.textContent = this.exportString
 
-            console.log(this.exportString)
+            loggerVer(this.exportString)
             this.exportString = ""
         }
     }
@@ -164,25 +213,22 @@ class DrawContext {
 
 
 
-interface Config {
-    scale: number
-}
+
 
 type Shape = "Line" | "Loop" | "Point" | "String" 
 
 type ExportType = "tikz"|"canvas"
 
 interface Elem {
+    id:string
     shape: Shape
     formalDistance(point: Vector): number
     move(delta: Vector): void
     moveAbsolute(location: Vector): void
+    description():string
 }
 
-let config: Config = {
-    /// lattice size
-    scale: 15
-}
+
 
 function direction(v1: Vector, v2: Vector): Vector {
     return v1.minus(v2)
@@ -208,10 +254,12 @@ function isLine(elem: Elem): elem is Line {
 
 
 class Vector implements Elem {
+    id:string
     shape: Shape = "Point"
     x: number = 0
     y: number = 0
     constructor(x: number, y: number) {
+        this.id = getElemID()
         this.x = x
         this.y = y
     }
@@ -252,9 +300,14 @@ class Vector implements Elem {
         this.x = location.x
         this.y = location.y
     }
+
+    description(): string {
+        return `${this.shape} id:${this.id} x:${this.x} y:${this.y}`
+    }
 }
 
 class MyString implements Elem {
+    id:string
     shape: "String" = "String"
     label: string
     origin: Vector = new Vector(0, 0)
@@ -264,6 +317,7 @@ class MyString implements Elem {
         return str
     }
     constructor(label: string) {
+        this.id = getElemID()
         this.label = label
     }
 
@@ -278,12 +332,17 @@ class MyString implements Elem {
     formalDistance(point: Vector): number {
         return this.origin.minus(point).length()
     }
+
+    description(): string {
+        return `${this.shape} id:${this.id} x:${this.origin.x} y:${this.origin.y} label:${this.label}`
+    }
 }
 
 type LineStyle = "normal" | "dash" | "wave"// waveはtodo
 // wave https://stackoverflow.com/questions/29917446/drawing-sine-wave-in-canvas
 
 class Line implements Elem {
+    id:string
     shape: "Line" = "Line"
     label: string = ""
     style: LineStyle = "normal"
@@ -304,6 +363,7 @@ class Line implements Elem {
     }
 
     constructor(label?: string) {
+        this.id = getElemID()
         if (label) {
             this.label = label
         }
@@ -326,8 +386,8 @@ class Line implements Elem {
     moveAbsolute(location: Vector): void {
         const length = this.length()
         const unitVec = this.directionUnit()
-        this.origin = location.add(unitVec.multi(length / 2))
-        this.to = location.add(unitVec.multi( - length / 2))
+        this.origin = location.add(unitVec.multi(- length / 2))
+        this.to = location.add(unitVec.multi( + length / 2))
     }
 
     length(): number {
@@ -382,6 +442,11 @@ class Line implements Elem {
         return originLength + 1
 
     }
+
+    description(): string {
+        return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) -> (${this.to.x}, ${this.to.y}) stayle:${this.style}`
+    }
+
 }
 
 interface LabelInfo {
@@ -391,6 +456,7 @@ interface LabelInfo {
 }
 
 class Loop implements Elem {
+    id:string
     shape: "Loop" = "Loop"
     style: LineStyle = "normal"
     fill: boolean = false
@@ -415,6 +481,7 @@ class Loop implements Elem {
     }
 
     constructor(label?: string) {
+        this.id = getElemID()
         if (label) {
             this.label = label
         }
@@ -440,6 +507,9 @@ class Loop implements Elem {
         return this.origin.minus(point).length()
     }
 
+    description(): string {
+        return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) radius = ${this.radius}) stayle:${this.style}`
+    }
 
 
 }
@@ -508,7 +578,7 @@ function drawWaveLine(line: Line, exportType: ExportType, color: Color = "normal
     for (let l = 0; l < line.length(); l += 0.1) {
         let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l*5) * 3/15
         let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l*5) * 3/15
-        console.log(`draw ${l} ${x} ${y}`)
+        loggerVer(`draw ${l} ${x} ${y}`)
         drawContext.lineTo(x, y)
         drawContext.moveTo(x, y)
         drawContext.stroke()
@@ -523,7 +593,9 @@ function drawWaveLine(line: Line, exportType: ExportType, color: Color = "normal
         let position = textPosition(line.label, pos, config)
         drawContext.fillText(line.label, position.x, position.y)
     }
+
     drawContext.closePath()
+    // drawContext.setLineDash([])
 }
 
 
@@ -553,6 +625,9 @@ function drawLine(line: Line, exportType:ExportType, color: Color = "normal") {
         let position = textPosition(line.label, pos, config)
         drawContext.fillText(line.label, position.x, position.y)
     }
+
+    drawContext.closePath()
+    // drawContext.setLineDash([])
 }
 
 function drawAllow(line: Line, exportType: ExportType,  color: Color = "normal") {
@@ -599,6 +674,9 @@ function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
             drawContext.fillText(lab.label, position.x, position.y)
         })
     }
+
+    drawContext.closePath()
+    // drawContext.setLineDash([])
 }
 
 function drawPoint(point: Vector, exportType: ExportType,  color: Color = "normal") {
@@ -606,7 +684,7 @@ function drawPoint(point: Vector, exportType: ExportType,  color: Color = "norma
     const y = point.y 
     drawContext.beginPath()
     drawContext.setFillColor(color)
-    console.log(`drawPoint ${x}_${y}, ${getColor(color)}`)
+    loggerVer(`drawPoint ${x}_${y}, ${getColor(color)}`)
     drawContext.fillRect(x - 1/15, y - 1/15, 3/15, 3/15)
     drawContext.closePath()
 }
@@ -618,7 +696,7 @@ function drawText(str: MyString, exportType: ExportType, color: Color = "normal"
 
     drawContext.setFillColor(color)
     drawContext.fillText(str.label, x, y)
-    console.log(`drawText ${x}_${y}, ${getColor(color)}`)
+    loggerVer(`drawText ${x}_${y}, ${getColor(color)}`)
     drawContext.closePath()
 }
 
@@ -821,17 +899,18 @@ class RDRepository {
     currentSubIndex: number| undefined = undefined
     elements: Elem[] = []
     selectCount: number = 0
+    idCount = 0
 
     history: RepositoryCommand[] = []
 
     currentElement(): Elem | undefined {
-        // console.log("currentElement:length:"+this.elements.length)
-        // console.log("currentIndex:"+this.currentIndex)
+        // loggerVer("currentElement:length:"+this.elements.length)
+        // loggerVer("currentIndex:"+this.currentIndex)
 
         if (this.currentIndex != undefined && (this.currentIndex < this.elements.length)) {
             return this.elements[this.currentIndex]
         }
-        // console.log("no currentElement")
+        // loggerVer("no currentElement")
         return undefined
     }
 
@@ -906,7 +985,7 @@ class RDRepository {
         this.vertexList.push(vertex)
         this.elements.push(vertex)
         this.currentIndex = this.elements.length - 1
-        console.log("currentIndex"+ this.currentIndex)
+        loggerVer("currentIndex"+ this.currentIndex)
     }
 
     setLoop(loop: Loop) {
@@ -936,10 +1015,10 @@ class RDRepository {
     }
 
     nextElem() {
-        console.log("nextElem")
+        loggerVer("nextElem")
         if (this.currentIndex == undefined) {
             if (this.elements.length == 0) {
-                console.log("nextElem return")
+                loggerVer("nextElem return")
                 return
             }
             this.currentIndex = -1
@@ -948,7 +1027,7 @@ class RDRepository {
         if (this.currentIndex >= this.elements.length) {
             this.currentIndex = 0
         }
-        console.log("currentIndex" + this.currentIndex)
+        loggerVer("currentIndex" + this.currentIndex)
     }
 
     nextSubElem() {
@@ -992,7 +1071,7 @@ class RDRepository {
 
     select(point: Vector) {
 
-        console.log("select")
+        loggerVer("select")
         this.selectCount++
 
         if (this.elements.length == 0) {
@@ -1011,7 +1090,7 @@ class RDRepository {
             let currentDistance = current.formalDistance(point)
             if (indexDistance <= currentDistance && this.currentIndex != index) {
                 if (/*this.selectCount <= 1 || this.currentSubIndex != index*/true) {
-                    console.log(`near:${findIndex}`)
+                    loggerVer(`near:${findIndex}`)
                     findIndex = index
                     current = indexElement
                 }
@@ -1021,7 +1100,7 @@ class RDRepository {
     }
 
     subSelect(point: Vector) {
-        console.log("subSelect")
+        loggerVer("subSelect")
         this.selectCount = 0
         if (this.elements.length == 0) {
             return
@@ -1038,7 +1117,7 @@ class RDRepository {
             let indexDistance = indexElement.formalDistance(point)
             let currentDistance = current.formalDistance(point)
             if (indexDistance <= currentDistance && this.currentSubIndex != index) {
-                console.log(`near:${findIndex}`)
+                loggerVer(`near:${findIndex}`)
                 findIndex = index
                 current = indexElement
             }
@@ -1172,19 +1251,19 @@ class RDDraw {
         //     3, 3)
         // // context.stroke()
         // context.closePath()
-        // console.log(`move:${ev.x}_${ev.y}`)
+        // loggerVer(`move:${ev.x}_${ev.y}`)
 
         this.prevX = ev.offsetX + config.scale/2
         this.prevY = ev.offsetY + config.scale / 2
         
-        // console.log("move")
+        // loggerVer("move")
         if (this.isMouseDown == "Down") {
             this.drag(ev)
         }
     }
 
     keyPress(ev: KeyboardEvent) {
-        console.log("key:" + ev.key)
+        loggerVer("key:" + ev.key)
         const scale = config.scale
         const x = Math.floor(this.prevX / scale)
         const y = Math.floor(this.prevY / scale)
@@ -1196,14 +1275,14 @@ class RDDraw {
                 // if (current && isLine(current)) {
                 //     current.label = this.stringMode
                 //     this.stringMode = undefined
-                //     console.log("stringMode OUT")
+                //     loggerVer("stringMode OUT")
                 //     this.drawAll()
                 //     return
                 // }
                 // if (current && isLoop(current)) {
                 //     current.label = this.stringMode
                 //     this.stringMode = undefined
-                //     console.log("stringMode OUT")
+                //     loggerVer("stringMode OUT")
                 //     this.drawAll()
                 //     return
                 // }
@@ -1211,18 +1290,18 @@ class RDDraw {
                 str.origin = new Vector(x, y)
                 this.repository.doCommand(new SetString(str))
                 this.stringMode = undefined
-                console.log("stringMode OUT")
+                loggerVer("stringMode OUT")
                 this.drawAll()
                 return
             }
 
             this.stringMode = this.stringMode + ev.key
-            console.log("stringMode:", this.stringMode)
+            loggerVer("stringMode:"+ this.stringMode)
             return
         }
 
         if (ev.key == "/") {
-            console.log("stringMode In")
+            loggerVer("stringMode In")
             this.stringMode = ""
             return
         }
@@ -1268,7 +1347,7 @@ class RDDraw {
         }
 
         if (ev.key == "W") {
-            console.log("W hit")
+            loggerVer("W hit")
             this.changeArcAngle()
         }
 
@@ -1335,35 +1414,35 @@ class RDDraw {
     }
 
     drag(ev: MouseEvent) {
-        console.log("drag")
+        loggerVer("drag")
         let current = this.repository.currentElement()
         current?.moveAbsolute(new Vector(this.prevX, this.prevY).multi(1 / config.scale))
         this.drawAll()
     }
 
     keyUp() {
-        console.log("keyUp")
+        loggerVer("keyUp")
         let current = this.repository.currentElement()
         current?.move(new Vector(0, -1).multi(1 / config.scale))
         this.drawAll()
     }
 
     keyRight() {
-        console.log("keyRight")
+        loggerVer("keyRight")
         let current = this.repository.currentElement()
         current?.move(new Vector(1, 0).multi(1/config.scale))
         this.drawAll()
     }
 
     keyLeft() {
-        console.log("keyLeft")
+        loggerVer("keyLeft")
         let current = this.repository.currentElement()
         current?.move(new Vector(-1, 0).multi(1 / config.scale))
         this.drawAll()
     }
 
     keyDown() {
-        console.log("keyDown")
+        loggerVer("keyDown")
         let current = this.repository.currentElement()
         current?.move(new Vector(0, 1).multi(1 / config.scale))
         this.drawAll()
@@ -1399,13 +1478,13 @@ class RDDraw {
 
 
     putVertex(vertex: Vector) {
-        console.log("put vertex..")
+        loggerVer("put vertex..")
         this.repository.doCommand(new SetVertex(vertex))
         this.drawAll()
     }
 
     putLoop(x: number, y: number) {
-        console.log("put Loop..")
+        loggerVer("put Loop..")
         const loop = new Loop()
         loop.origin = new Vector(x, y)
         this.repository.doCommand(new SetLoop(loop))
@@ -1425,7 +1504,7 @@ class RDDraw {
         const elms = this.repository.getAllElements()
         drawContext.beginPath()
         elms.forEach((elm, index) => {
-            console.log("draw..")
+            loggerVer("draw..")
             draw(elm, exportType)
         })
 
@@ -1442,11 +1521,13 @@ class RDDraw {
         const sub = this.repository.currentSubElement()
         if (sub) {
             draw(sub, "canvas", "sub")
+            drawContext.output("sub:   "+sub.description(), "html", "sub")
         }
 
         const current = this.repository.currentElement()
         if (current) {
             draw(current, "canvas", "select")
+            drawContext.output("current:"+current.description(), "html", "current")
         }
         drawContext.closePath()
     }
@@ -1585,7 +1666,7 @@ class RDDraw {
     }
 
     changeArcAngle() {
-        console.log("changeArcAngle..")
+        loggerVer("changeArcAngle..")
         let elem = this.repository.currentElement()
         if (!elem) {
             return

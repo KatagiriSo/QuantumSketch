@@ -59,6 +59,13 @@
         padding: 0px;
     }
 
+    div#sub {
+        border-bottom: solid 1px greenyellow;
+    }
+    div#current {
+        border-bottom: solid 1px red;
+    }
+
         help {
         display: inline-block;
         border-left: solid 1px black;
@@ -73,10 +80,11 @@
     <!--[if lt IE 7]>
             <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
         <![endif]-->
-    <a href="https://github.com/KatagiriSo/RDFeynmann">RDFeynmann ver. 0.2.2 by So Katagiri</a>
+    <a href="https://github.com/KatagiriSo/RDFeynmann">RDFeynmann ver. 0.2.4 by So Katagiri</a>
     <div class="canvas_box">
         <canvas id="canvas" width="640" height="480"></canvas>
     </div>
+    <div><div id = "current"></div><div id="sub"></div></div>
     <div class="add">
         <p>Add Point [v]</p>
         <p>Add Loop [l]</p>

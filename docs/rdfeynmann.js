@@ -1,8 +1,29 @@
 "use strict";
-const x = "RDFeynmann v0.2  So Katagiri";
+const x = "RDFeynmann  So Katagiri";
 console.log(x);
 let canvas = document.getElementById("canvas");
 let context_ = canvas.getContext("2d");
+let config = {
+    /// lattice size
+    scale: 15,
+    log: "ON"
+};
+function loggerVer(text) {
+    if (config.log == "VER") {
+        console.log(text);
+    }
+}
+function loggerOn(text) {
+    if (config.log == "ON" || config.log == "VER") {
+        console.log(text);
+    }
+}
+let elemIDCounter = 0;
+function getElemID() {
+    let id = `${elemIDCounter}`;
+    elemIDCounter++;
+    return id;
+}
 class DrawContext {
     constructor(context) {
         this.exportType = "canvas";
@@ -11,6 +32,20 @@ class DrawContext {
         this.coordinate = new Vector(0, 0);
         this.scale = config.scale;
         this.canvasContext = context;
+    }
+    output(desc, exportType, id) {
+        if (this.exportType == "canvas") {
+            if (id == "sub") {
+                let selector = document.querySelector("div#sub");
+                selector.textContent = desc;
+                return;
+            }
+            if (id == "current") {
+                let selector = document.querySelector("div#current");
+                selector.textContent = desc;
+                return;
+            }
+        }
     }
     setStrokeColor(color) {
         if (this.exportType == "canvas") {
@@ -49,6 +84,7 @@ class DrawContext {
         }
     }
     setLineDash(dash) {
+        loggerOn("setLineDash:" + dash);
         this.dashStyle = dash;
     }
     addExport(txt) {
@@ -70,7 +106,7 @@ class DrawContext {
     }
     fillRect(x, y, w, h) {
         if (this.exportType == "canvas") {
-            console.log(`fillRect${x} ${y} ${w} ${h}`);
+            loggerVer(`fillRect${x} ${y} ${w} ${h}`);
             this.canvasContext.fillRect(x * this.scale, y * this.scale, w * this.scale, h * this.scale);
             return;
         }
@@ -98,6 +134,7 @@ class DrawContext {
     }
     arc(x, y, radius, startAngle, endAngle) {
         if (this.exportType == "canvas") {
+            this.canvasContext.setLineDash(this.dashStyle);
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle);
             return;
         }
@@ -125,15 +162,11 @@ class DrawContext {
             this.addExport("}\n ");
             let selector = document.querySelector("div#output");
             selector.textContent = this.exportString;
-            console.log(this.exportString);
+            loggerVer(this.exportString);
             this.exportString = "";
         }
     }
 }
-let config = {
-    /// lattice size
-    scale: 15
-};
 function direction(v1, v2) {
     return v1.minus(v2);
 }
@@ -155,6 +188,7 @@ class Vector {
         this.shape = "Point";
         this.x = 0;
         this.y = 0;
+        this.id = getElemID();
         this.x = x;
         this.y = y;
     }
@@ -191,11 +225,15 @@ class Vector {
         this.x = location.x;
         this.y = location.y;
     }
+    description() {
+        return `${this.shape} id:${this.id} x:${this.x} y:${this.y}`;
+    }
 }
 class MyString {
     constructor(label) {
         this.shape = "String";
         this.origin = new Vector(0, 0);
+        this.id = getElemID();
         this.label = label;
     }
     copy() {
@@ -212,6 +250,9 @@ class MyString {
     formalDistance(point) {
         return this.origin.minus(point).length();
     }
+    description() {
+        return `${this.shape} id:${this.id} x:${this.origin.x} y:${this.origin.y} label:${this.label}`;
+    }
 }
 // wave https://stackoverflow.com/questions/29917446/drawing-sine-wave-in-canvas
 class Line {
@@ -223,6 +264,7 @@ class Line {
         this.allow = true;
         this.origin = new Vector(0, 0);
         this.to = new Vector(0, 0);
+        this.id = getElemID();
         if (label) {
             this.label = label;
         }
@@ -252,8 +294,8 @@ class Line {
     moveAbsolute(location) {
         const length = this.length();
         const unitVec = this.directionUnit();
-        this.origin = location.add(unitVec.multi(length / 2));
-        this.to = location.add(unitVec.multi(-length / 2));
+        this.origin = location.add(unitVec.multi(-length / 2));
+        this.to = location.add(unitVec.multi(+length / 2));
     }
     length() {
         return this.to.minus(this.origin).length();
@@ -298,6 +340,9 @@ class Line {
         }
         return originLength + 1;
     }
+    description() {
+        return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) -> (${this.to.x}, ${this.to.y}) stayle:${this.style}`;
+    }
 }
 class Loop {
     constructor(label) {
@@ -310,6 +355,7 @@ class Loop {
         this.labels = [];
         this.loopBeginAngle = 0;
         this.loopEndAngle = Math.PI * 2;
+        this.id = getElemID();
         if (label) {
             this.label = label;
         }
@@ -340,6 +386,9 @@ class Loop {
     }
     formalDistance(point) {
         return this.origin.minus(point).length();
+    }
+    description() {
+        return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) radius = ${this.radius}) stayle:${this.style}`;
     }
 }
 class Vertex extends Loop {
@@ -397,7 +446,7 @@ function drawWaveLine(line, exportType, color = "normal") {
     for (let l = 0; l < line.length(); l += 0.1) {
         let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l * 5) * 3 / 15;
         let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l * 5) * 3 / 15;
-        console.log(`draw ${l} ${x} ${y}`);
+        loggerVer(`draw ${l} ${x} ${y}`);
         drawContext.lineTo(x, y);
         drawContext.moveTo(x, y);
         drawContext.stroke();
@@ -412,6 +461,7 @@ function drawWaveLine(line, exportType, color = "normal") {
         drawContext.fillText(line.label, position.x, position.y);
     }
     drawContext.closePath();
+    // drawContext.setLineDash([])
 }
 function drawLine(line, exportType, color = "normal") {
     if (line.style == "wave") {
@@ -439,6 +489,8 @@ function drawLine(line, exportType, color = "normal") {
         let position = textPosition(line.label, pos, config);
         drawContext.fillText(line.label, position.x, position.y);
     }
+    drawContext.closePath();
+    // drawContext.setLineDash([])
 }
 function drawAllow(line, exportType, color = "normal") {
     let center = line.center();
@@ -481,13 +533,15 @@ function drawLoop(loop, exportType, color = "normal") {
             drawContext.fillText(lab.label, position.x, position.y);
         });
     }
+    drawContext.closePath();
+    // drawContext.setLineDash([])
 }
 function drawPoint(point, exportType, color = "normal") {
     const x = point.x;
     const y = point.y;
     drawContext.beginPath();
     drawContext.setFillColor(color);
-    console.log(`drawPoint ${x}_${y}, ${getColor(color)}`);
+    loggerVer(`drawPoint ${x}_${y}, ${getColor(color)}`);
     drawContext.fillRect(x - 1 / 15, y - 1 / 15, 3 / 15, 3 / 15);
     drawContext.closePath();
 }
@@ -497,7 +551,7 @@ function drawText(str, exportType, color = "normal") {
     drawContext.beginPath();
     drawContext.setFillColor(color);
     drawContext.fillText(str.label, x, y);
-    console.log(`drawText ${x}_${y}, ${getColor(color)}`);
+    loggerVer(`drawText ${x}_${y}, ${getColor(color)}`);
     drawContext.closePath();
 }
 // function drawVertex(loop: Vertex) {
@@ -660,15 +714,16 @@ class RDRepository {
         this.currentSubIndex = undefined;
         this.elements = [];
         this.selectCount = 0;
+        this.idCount = 0;
         this.history = [];
     }
     currentElement() {
-        // console.log("currentElement:length:"+this.elements.length)
-        // console.log("currentIndex:"+this.currentIndex)
+        // loggerVer("currentElement:length:"+this.elements.length)
+        // loggerVer("currentIndex:"+this.currentIndex)
         if (this.currentIndex != undefined && (this.currentIndex < this.elements.length)) {
             return this.elements[this.currentIndex];
         }
-        // console.log("no currentElement")
+        // loggerVer("no currentElement")
         return undefined;
     }
     currentSubElement() {
@@ -729,7 +784,7 @@ class RDRepository {
         this.vertexList.push(vertex);
         this.elements.push(vertex);
         this.currentIndex = this.elements.length - 1;
-        console.log("currentIndex" + this.currentIndex);
+        loggerVer("currentIndex" + this.currentIndex);
     }
     setLoop(loop) {
         const x = loop.origin.x;
@@ -755,10 +810,10 @@ class RDRepository {
         this.currentIndex = this.elements.length - 1;
     }
     nextElem() {
-        console.log("nextElem");
+        loggerVer("nextElem");
         if (this.currentIndex == undefined) {
             if (this.elements.length == 0) {
-                console.log("nextElem return");
+                loggerVer("nextElem return");
                 return;
             }
             this.currentIndex = -1;
@@ -767,7 +822,7 @@ class RDRepository {
         if (this.currentIndex >= this.elements.length) {
             this.currentIndex = 0;
         }
-        console.log("currentIndex" + this.currentIndex);
+        loggerVer("currentIndex" + this.currentIndex);
     }
     nextSubElem() {
         if (this.currentSubIndex == undefined) {
@@ -806,7 +861,7 @@ class RDRepository {
         }
     }
     select(point) {
-        console.log("select");
+        loggerVer("select");
         this.selectCount++;
         if (this.elements.length == 0) {
             return;
@@ -824,7 +879,7 @@ class RDRepository {
             let currentDistance = current.formalDistance(point);
             if (indexDistance <= currentDistance && this.currentIndex != index) {
                 if ( /*this.selectCount <= 1 || this.currentSubIndex != index*/true) {
-                    console.log(`near:${findIndex}`);
+                    loggerVer(`near:${findIndex}`);
                     findIndex = index;
                     current = indexElement;
                 }
@@ -833,7 +888,7 @@ class RDRepository {
         this.currentIndex = findIndex;
     }
     subSelect(point) {
-        console.log("subSelect");
+        loggerVer("subSelect");
         this.selectCount = 0;
         if (this.elements.length == 0) {
             return;
@@ -850,7 +905,7 @@ class RDRepository {
             let indexDistance = indexElement.formalDistance(point);
             let currentDistance = current.formalDistance(point);
             if (indexDistance <= currentDistance && this.currentSubIndex != index) {
-                console.log(`near:${findIndex}`);
+                loggerVer(`near:${findIndex}`);
                 findIndex = index;
                 current = indexElement;
             }
@@ -954,16 +1009,16 @@ class RDDraw {
         //     3, 3)
         // // context.stroke()
         // context.closePath()
-        // console.log(`move:${ev.x}_${ev.y}`)
+        // loggerVer(`move:${ev.x}_${ev.y}`)
         this.prevX = ev.offsetX + config.scale / 2;
         this.prevY = ev.offsetY + config.scale / 2;
-        // console.log("move")
+        // loggerVer("move")
         if (this.isMouseDown == "Down") {
             this.drag(ev);
         }
     }
     keyPress(ev) {
-        console.log("key:" + ev.key);
+        loggerVer("key:" + ev.key);
         const scale = config.scale;
         const x = Math.floor(this.prevX / scale);
         const y = Math.floor(this.prevY / scale);
@@ -973,14 +1028,14 @@ class RDDraw {
                 // if (current && isLine(current)) {
                 //     current.label = this.stringMode
                 //     this.stringMode = undefined
-                //     console.log("stringMode OUT")
+                //     loggerVer("stringMode OUT")
                 //     this.drawAll()
                 //     return
                 // }
                 // if (current && isLoop(current)) {
                 //     current.label = this.stringMode
                 //     this.stringMode = undefined
-                //     console.log("stringMode OUT")
+                //     loggerVer("stringMode OUT")
                 //     this.drawAll()
                 //     return
                 // }
@@ -988,16 +1043,16 @@ class RDDraw {
                 str.origin = new Vector(x, y);
                 this.repository.doCommand(new SetString(str));
                 this.stringMode = undefined;
-                console.log("stringMode OUT");
+                loggerVer("stringMode OUT");
                 this.drawAll();
                 return;
             }
             this.stringMode = this.stringMode + ev.key;
-            console.log("stringMode:", this.stringMode);
+            loggerVer("stringMode:" + this.stringMode);
             return;
         }
         if (ev.key == "/") {
-            console.log("stringMode In");
+            loggerVer("stringMode In");
             this.stringMode = "";
             return;
         }
@@ -1032,7 +1087,7 @@ class RDDraw {
             this.antiRotation();
         }
         if (ev.key == "W") {
-            console.log("W hit");
+            loggerVer("W hit");
             this.changeArcAngle();
         }
         if (ev.key == "X") {
@@ -1082,31 +1137,31 @@ class RDDraw {
         }
     }
     drag(ev) {
-        console.log("drag");
+        loggerVer("drag");
         let current = this.repository.currentElement();
         current === null || current === void 0 ? void 0 : current.moveAbsolute(new Vector(this.prevX, this.prevY).multi(1 / config.scale));
         this.drawAll();
     }
     keyUp() {
-        console.log("keyUp");
+        loggerVer("keyUp");
         let current = this.repository.currentElement();
         current === null || current === void 0 ? void 0 : current.move(new Vector(0, -1).multi(1 / config.scale));
         this.drawAll();
     }
     keyRight() {
-        console.log("keyRight");
+        loggerVer("keyRight");
         let current = this.repository.currentElement();
         current === null || current === void 0 ? void 0 : current.move(new Vector(1, 0).multi(1 / config.scale));
         this.drawAll();
     }
     keyLeft() {
-        console.log("keyLeft");
+        loggerVer("keyLeft");
         let current = this.repository.currentElement();
         current === null || current === void 0 ? void 0 : current.move(new Vector(-1, 0).multi(1 / config.scale));
         this.drawAll();
     }
     keyDown() {
-        console.log("keyDown");
+        loggerVer("keyDown");
         let current = this.repository.currentElement();
         current === null || current === void 0 ? void 0 : current.move(new Vector(0, 1).multi(1 / config.scale));
         this.drawAll();
@@ -1135,12 +1190,12 @@ class RDDraw {
         this.drawAll();
     }
     putVertex(vertex) {
-        console.log("put vertex..");
+        loggerVer("put vertex..");
         this.repository.doCommand(new SetVertex(vertex));
         this.drawAll();
     }
     putLoop(x, y) {
-        console.log("put Loop..");
+        loggerVer("put Loop..");
         const loop = new Loop();
         loop.origin = new Vector(x, y);
         this.repository.doCommand(new SetLoop(loop));
@@ -1154,7 +1209,7 @@ class RDDraw {
         const elms = this.repository.getAllElements();
         drawContext.beginPath();
         elms.forEach((elm, index) => {
-            console.log("draw..");
+            loggerVer("draw..");
             draw(elm, exportType);
         });
         drawContext.endExport();
@@ -1167,10 +1222,12 @@ class RDDraw {
         const sub = this.repository.currentSubElement();
         if (sub) {
             draw(sub, "canvas", "sub");
+            drawContext.output("sub:   " + sub.description(), "html", "sub");
         }
         const current = this.repository.currentElement();
         if (current) {
             draw(current, "canvas", "select");
+            drawContext.output("current:" + current.description(), "html", "current");
         }
         drawContext.closePath();
     }
@@ -1299,7 +1356,7 @@ class RDDraw {
         }
     }
     changeArcAngle() {
-        console.log("changeArcAngle..");
+        loggerVer("changeArcAngle..");
         let elem = this.repository.currentElement();
         if (!elem) {
             return;
