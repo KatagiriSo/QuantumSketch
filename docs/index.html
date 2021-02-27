@@ -58,6 +58,15 @@
 
         padding: 0px;
     }
+
+        help {
+        display: inline-block;
+        border-left: solid 1px black;
+        border-right: solid 1px black;
+        border-bottom: solid 1px gray;
+        border-top: solid 1px gray;
+        padding: 0px 6px 0px 6px;
+    }
 </style>
 
 <body>
@@ -102,7 +111,16 @@
         <p>String Mode In/Out [/]</p>
         <p>Export tikz text [e]</p>
     </div>
+    <help>
+            <p>\documentclass[10pt]{article}</p>
+            <p>\usepackage{amsmath}</p>
+            <p>\usepackage{tikz} </p>
+            <p>\usetikzlibrary{intersections, calc, arrows} </p>
+            <p>\begin{document}</p>
+            <p>\end{document}</p>
+    </help>
     <div> OutPut</div>
+
     <div id="output"></div>
 
     <script src="rdfeynmann.js" async defer></script>
