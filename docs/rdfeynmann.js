@@ -28,7 +28,8 @@ class DrawContext {
     constructor(context) {
         this.exportType = "canvas";
         this.exportString = "";
-        this.dashStyle = [];
+        this.lineDashStyle = "normal";
+        this.loopDashStyle = "normal";
         this.coordinate = new Vector(0, 0);
         this.scale = config.scale;
         this.canvasContext = context;
@@ -83,22 +84,36 @@ class DrawContext {
             return;
         }
     }
-    setLineDash(dash) {
-        loggerOn("setLineDash:" + dash);
-        this.dashStyle = dash;
+    setLineDash(style) {
+        loggerVer("setLineDash:" + style);
+        this.lineDashStyle = style;
+    }
+    setLoopDash(style) {
+        loggerVer("setLoopDash:" + style);
+        this.loopDashStyle = style;
     }
     addExport(txt) {
         this.exportString += txt;
     }
     lineTo(x, y) {
         if (this.exportType == "canvas") {
-            this.canvasContext.setLineDash(this.dashStyle);
+            if (this.lineDashStyle == "dash") {
+                this.canvasContext.setLineDash([2, 2]);
+            }
+            else {
+                this.canvasContext.setLineDash([]);
+            }
             this.canvasContext.moveTo(this.coordinate.x * this.scale, this.coordinate.y * this.scale);
             this.canvasContext.lineTo(x * this.scale, y * this.scale);
             return;
         }
         if (this.exportType == "tikz") {
-            this.addExport(`\\draw (${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`);
+            if (this.lineDashStyle == "dash") {
+                this.addExport(`\\draw [dashed](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`);
+            }
+            else {
+                this.addExport(`\\draw (${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`);
+            }
             return;
         }
     }
@@ -134,18 +149,27 @@ class DrawContext {
     }
     arc(x, y, radius, startAngle, endAngle) {
         if (this.exportType == "canvas") {
-            this.canvasContext.setLineDash(this.dashStyle);
+            if (this.loopDashStyle == "dash") {
+                this.canvasContext.setLineDash([2, 2]);
+            }
+            else {
+                this.canvasContext.setLineDash([]);
+            }
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle);
             return;
         }
         if (this.exportType == "tikz") {
             const sa = startAngle / (2 * Math.PI) * 360;
             const ea = endAngle / (2 * Math.PI) * 360;
+            let dashed = "";
+            if (this.loopDashStyle == "dash") {
+                dashed = "[dashed]";
+            }
             if (Math.abs(endAngle - startAngle) == 2 * Math.PI) {
-                this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`);
+                this.addExport(`\\draw ${dashed} (${x},${y}) circle [radius=${radius}];`);
             }
             else {
-                this.addExport(`\\draw(${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`);
+                this.addExport(`\\draw ${dashed} (${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`);
             }
             return;
         }
@@ -437,10 +461,10 @@ function drawWaveLine(line, exportType, color = "normal") {
     drawContext.setStrokeColor(color);
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     if (line.style == "dash") {
-        drawContext.setLineDash([2, 2]);
+        drawContext.setLineDash("dash");
     }
     else {
-        drawContext.setLineDash([]);
+        drawContext.setLineDash("normal");
     }
     drawContext.moveTo(origin.x, origin.y);
     for (let l = 0; l < line.length(); l += 0.1) {
@@ -474,10 +498,10 @@ function drawLine(line, exportType, color = "normal") {
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     drawContext.setStrokeColor(color);
     if (line.style == "dash") {
-        drawContext.setLineDash([2, 2]);
+        drawContext.setLineDash("dash");
     }
     else {
-        drawContext.setLineDash([]);
+        drawContext.setLineDash("normal");
     }
     drawContext.stroke();
     if (line.allow) {
@@ -511,10 +535,10 @@ function drawLoop(loop, exportType, color = "normal") {
     drawContext.beginPath();
     drawContext.setStrokeColor(color);
     if (loop.style == "dash") {
-        drawContext.setLineDash([2, 2]);
+        drawContext.setLoopDash("dash");
     }
     else {
-        drawContext.setLineDash([]);
+        drawContext.setLoopDash("normal");
     }
     drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, loop.loopBeginAngle, loop.loopEndAngle);
     drawContext.stroke();

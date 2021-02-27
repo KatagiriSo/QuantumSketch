@@ -39,7 +39,8 @@ class DrawContext {
     private exportType:ExportType = "canvas"
     private canvasContext: CanvasRenderingContext2D
     private exportString: string = ""
-    private dashStyle: number[] = []
+    private lineDashStyle: LineStyle = "normal"
+    private loopDashStyle: LineStyle = "normal"
     private coordinate: Vector = new Vector(0, 0)
     private scale: number = config.scale
     constructor(context: CanvasRenderingContext2D) {
@@ -107,9 +108,14 @@ class DrawContext {
         }
     }
 
-    setLineDash(dash: number[]) {
-        loggerOn("setLineDash:"+dash)
-        this.dashStyle = dash
+    setLineDash(style: LineStyle) {
+        loggerVer("setLineDash:" + style)
+        this.lineDashStyle = style
+    }
+
+    setLoopDash(style: LineStyle) {
+        loggerVer("setLoopDash:" + style)
+        this.loopDashStyle = style
     }
 
     addExport(txt: String) {
@@ -118,14 +124,22 @@ class DrawContext {
 
     lineTo(x: number, y: number) {
         if (this.exportType == "canvas") {
-            this.canvasContext.setLineDash(this.dashStyle)
+            if (this.lineDashStyle == "dash") {
+                this.canvasContext.setLineDash([2,2])
+            } else {
+                this.canvasContext.setLineDash([])
+            }
             this.canvasContext.moveTo(this.coordinate.x * this.scale, this.coordinate.y * this.scale)
             this.canvasContext.lineTo(x * this.scale, y * this.scale)
             return
         }
 
         if (this.exportType == "tikz") {
-            this.addExport(`\\draw (${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+            if (this.lineDashStyle == "dash") {
+                this.addExport(`\\draw [dashed](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+            } else {
+                this.addExport(`\\draw (${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+            }
             return
         }
     }
@@ -171,18 +185,26 @@ class DrawContext {
 
     arc(x: number, y: number, radius: number, startAngle: number, endAngle: number) {
         if (this.exportType == "canvas") {
-            this.canvasContext.setLineDash(this.dashStyle)
+            if (this.loopDashStyle == "dash") {
+                this.canvasContext.setLineDash([2,2])
+            } else {
+                this.canvasContext.setLineDash([])
+            }
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle)
             return
         }
 
-        if (this.exportType == "tikz") {
+        if (this.exportType == "tikz") {            
             const sa = startAngle / (2 * Math.PI) * 360
             const ea = endAngle / (2 * Math.PI) * 360
+            let dashed = ""
+            if (this.loopDashStyle == "dash") {
+                dashed = "[dashed]"
+            }
             if ( Math.abs(endAngle - startAngle) ==  2 * Math.PI) {
-                this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`)
+                this.addExport(`\\draw ${dashed} (${x},${y}) circle [radius=${radius}];`)
             } else {
-                this.addExport(`\\draw(${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`)
+                this.addExport(`\\draw ${dashed} (${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`)
             }
             return
         }
@@ -569,9 +591,9 @@ function drawWaveLine(line: Line, exportType: ExportType, color: Color = "normal
     drawContext.setStrokeColor(color)
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     if (line.style == "dash") {
-        drawContext.setLineDash([2, 2])
+        drawContext.setLineDash("dash")
     } else {
-        drawContext.setLineDash([])
+        drawContext.setLineDash("normal")
     }
 
     drawContext.moveTo(origin.x, origin.y)
@@ -611,9 +633,9 @@ function drawLine(line: Line, exportType:ExportType, color: Color = "normal") {
     // context.arc(100, 10, 50, 0, Math.PI * 2)
     drawContext.setStrokeColor(color)
     if (line.style == "dash") {
-        drawContext.setLineDash([2,2])
+        drawContext.setLineDash("dash")
     } else {
-        drawContext.setLineDash([])
+        drawContext.setLineDash("normal")
     }
     drawContext.stroke()
     if (line.allow) {
@@ -650,9 +672,9 @@ function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
     drawContext.beginPath()
     drawContext.setStrokeColor(color)
     if (loop.style == "dash") {
-        drawContext.setLineDash([2, 2])
+        drawContext.setLoopDash("dash")
     } else {
-        drawContext.setLineDash([])
+        drawContext.setLoopDash("normal")
     }
     drawContext.arc(loop.origin.x,
         loop.origin.y,
