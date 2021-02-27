@@ -66,5 +66,7 @@ e: export tikz text
 
 W, X, E, C: arc angle change
 
+r,R: rotation
+
 # LICENSE
 MIT
