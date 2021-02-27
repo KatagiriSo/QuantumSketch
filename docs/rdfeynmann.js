@@ -106,6 +106,10 @@ class DrawContext {
             return;
         }
         if (this.exportType == "tikz") {
+            if (linestyle == "wave") {
+                this.addExport(`\\draw [snake=snake, segment amplitude=0.2mm,segment length=1mm](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`);
+                return;
+            }
             if (linestyle == "dash") {
                 this.addExport(`\\draw [dashed](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`);
             }
@@ -485,15 +489,15 @@ function drawWaveLine(line, exportType, color = "normal") {
 }
 function drawLine(line, exportType, color = "normal") {
     if (line.style == "wave") {
-        drawWaveLine(line, exportType, color);
-        return;
+        ///MARK: not good
+        if (exportType == "canvas") {
+            drawWaveLine(line, exportType, color);
+            return;
+        }
     }
     drawContext.beginPath();
     drawContext.setStrokeColor(color);
-    let linestyle = "normal";
-    if (line.style == "dash") {
-        linestyle = "dash";
-    }
+    let linestyle = line.style;
     drawContext.moveTo(line.origin.x, line.origin.y);
     drawContext.lineTo(line.to.x, line.to.y, linestyle);
     // context.arc(100, 10, 50, 0, Math.PI * 2)

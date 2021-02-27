@@ -36,7 +36,7 @@ function getElemID(): string {
 
 
 class DrawContext {
-    private exportType:ExportType = "canvas"
+    exportType:ExportType = "canvas"
     private canvasContext: CanvasRenderingContext2D
     private exportString: string = ""
     private coordinate: Vector = new Vector(0, 0)
@@ -127,12 +127,20 @@ class DrawContext {
             } else {
                 this.canvasContext.setLineDash([])
             }
+
             this.canvasContext.moveTo(this.coordinate.x * this.scale, this.coordinate.y * this.scale)
             this.canvasContext.lineTo(x * this.scale, y * this.scale)
             return
+
+
         }
 
         if (this.exportType == "tikz") {
+            if (linestyle == "wave") {
+                this.addExport(`\\draw [snake=snake, segment amplitude=0.2mm,segment length=1mm](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+                return
+            }
+
             if (linestyle == "dash") {
                 this.addExport(`\\draw [dashed](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
             } else {
@@ -620,17 +628,17 @@ function drawWaveLine(line: Line, exportType: ExportType, color: Color = "normal
 
 function drawLine(line: Line, exportType:ExportType, color: Color = "normal") {
     if (line.style == "wave") {
-        drawWaveLine(line, exportType, color)
-        return
+        ///MARK: not good
+        if (exportType == "canvas") {
+            drawWaveLine(line, exportType, color)
+            return
+        }
     }
 
     drawContext.beginPath()
 
     drawContext.setStrokeColor(color)
-    let linestyle:LineStyle = "normal"
-    if (line.style == "dash") {
-        linestyle = "dash"
-    } 
+    let linestyle:LineStyle = line.style
 
     drawContext.moveTo(line.origin.x, line.origin.y)
     drawContext.lineTo(line.to.x, line.to.y, linestyle)
