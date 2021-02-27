@@ -1,5 +1,5 @@
 "use strict";
-const x = "RDFeynmann  So Katagiri";
+const x = "RDFeynmann v0.2  So Katagiri";
 console.log(x);
 let canvas = document.getElementById("canvas");
 let context_ = canvas.getContext("2d");
@@ -187,6 +187,10 @@ class Vector {
         this.x = vector.x;
         this.y = vector.y;
     }
+    moveAbsolute(location) {
+        this.x = location.x;
+        this.y = location.y;
+    }
 }
 class MyString {
     constructor(label) {
@@ -201,6 +205,9 @@ class MyString {
     }
     move(delta) {
         this.origin = this.origin.add(delta);
+    }
+    moveAbsolute(location) {
+        this.origin = location;
     }
     formalDistance(point) {
         return this.origin.minus(point).length();
@@ -233,6 +240,12 @@ class Line {
     move(delta) {
         this.origin = this.origin.add(delta);
         this.to = this.to.add(delta);
+    }
+    moveAbsolute(location) {
+        const length = this.length();
+        const unitVec = this.directionUnit();
+        this.origin = location.add(unitVec.multi(length / 2));
+        this.to = location.add(unitVec.multi(-length / 2));
     }
     length() {
         return this.to.minus(this.origin).length();
@@ -307,6 +320,9 @@ class Loop {
     }
     move(delta) {
         this.origin = this.origin.add(delta);
+    }
+    moveAbsolute(location) {
+        this.origin = location;
     }
     addLineTo(line) {
         line.to = this.origin.add(direction(line.origin, this.origin).unit().multi(this.radius));
@@ -847,6 +863,7 @@ class RDDraw {
     constructor(canvas) {
         this.repository = new RDRepository();
         this.isClick = false;
+        this.isMouseDown = "Up";
         this.clickIimeOutID = undefined;
         this.prevX = 0;
         this.prevY = 0;
@@ -863,6 +880,12 @@ class RDDraw {
         // canvas.addEventListener("dblclick", (ev) => {
         //     this.dbclick(ev)
         // })
+        canvas.addEventListener("mousedown", (ev) => {
+            this.mouseDown(ev);
+        });
+        canvas.addEventListener("mouseup", (ev) => {
+            this.mouseUp(ev);
+        });
         canvas.addEventListener("mousemove", (ev) => {
             this.move(ev);
         });
@@ -871,6 +894,7 @@ class RDDraw {
         });
     }
     click(ev) {
+        this.isMouseDown = "Up";
         const scale = config.scale;
         const x = Math.floor(this.prevX / scale);
         const y = Math.floor(this.prevY / scale);
@@ -895,6 +919,17 @@ class RDDraw {
     //     const y = Math.floor(this.prevY / scale)
     //     this.subSelect(new Vector(x, y))
     // }
+    mouseDown(ev) {
+        this.isMouseDown = "Downning";
+        setTimeout(() => {
+            if (this.isMouseDown == "Downning") {
+                this.isMouseDown = "Down";
+            }
+        }, 300);
+    }
+    mouseUp(ev) {
+        this.isMouseDown = "Up";
+    }
     move(ev) {
         const scale = config.scale;
         // context.beginPath()
@@ -914,6 +949,10 @@ class RDDraw {
         // console.log(`move:${ev.x}_${ev.y}`)
         this.prevX = ev.offsetX + config.scale / 2;
         this.prevY = ev.offsetY + config.scale / 2;
+        // console.log("move")
+        if (this.isMouseDown == "Down") {
+            this.drag(ev);
+        }
     }
     keyPress(ev) {
         console.log("key:" + ev.key);
@@ -1027,6 +1066,12 @@ class RDDraw {
         if (ev.key == "x") {
             this.changeScaleDown();
         }
+    }
+    drag(ev) {
+        console.log("drag");
+        let current = this.repository.currentElement();
+        current === null || current === void 0 ? void 0 : current.moveAbsolute(new Vector(this.prevX, this.prevY).multi(1 / config.scale));
+        this.drawAll();
     }
     keyUp() {
         console.log("keyUp");
