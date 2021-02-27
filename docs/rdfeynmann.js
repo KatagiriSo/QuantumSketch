@@ -901,8 +901,8 @@ class RDDraw {
         // // context.stroke()
         // context.closePath()
         // console.log(`move:${ev.x}_${ev.y}`)
-        this.prevX = ev.x;
-        this.prevY = ev.y;
+        this.prevX = ev.offsetX + config.scale / 2;
+        this.prevY = ev.offsetY + config.scale / 2;
     }
     keyPress(ev) {
         console.log("key:" + ev.key);
