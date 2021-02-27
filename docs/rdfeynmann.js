@@ -1,5 +1,5 @@
 "use strict";
-const x = "hello typescript";
+const x = "RDFeynmann  So Katagiri";
 console.log(x);
 let canvas = document.getElementById("canvas");
 let context_ = canvas.getContext("2d");

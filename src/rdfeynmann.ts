@@ -1,4 +1,4 @@
-const x: string = "hello typescript"
+const x: string = "RDFeynmann v0.2  So Katagiri"
 console.log(x)
 
 let canvas = document.getElementById("canvas") as HTMLCanvasElement
