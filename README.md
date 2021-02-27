@@ -12,6 +12,9 @@ This is a Feynmann Diagram editor.
 
 
 # Usage
+https://katagiriso.github.io/RDFeynmann/
+
+or
 
 Open index.html in your browser.
 
