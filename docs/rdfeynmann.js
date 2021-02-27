@@ -102,7 +102,14 @@ class DrawContext {
             return;
         }
         if (this.exportType == "tikz") {
-            this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`);
+            const sa = startAngle / (2 * Math.PI) * 360;
+            const ea = endAngle / (2 * Math.PI) * 360;
+            if (Math.abs(endAngle - startAngle) == 2 * Math.PI) {
+                this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`);
+            }
+            else {
+                this.addExport(`\\draw(${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`);
+            }
             return;
         }
     }
@@ -280,6 +287,8 @@ class Loop {
         this.radius = 1;
         this.label = "";
         this.labels = [];
+        this.loopBeginAngle = 0;
+        this.loopEndAngle = Math.PI * 2;
         if (label) {
             this.label = label;
         }
@@ -292,6 +301,8 @@ class Loop {
         loop.label = this.label;
         loop.labels = this.labels;
         loop.style = this.style;
+        loop.loopBeginAngle = this.loopBeginAngle;
+        loop.loopEndAngle = this.loopEndAngle;
         return loop;
     }
     move(delta) {
@@ -429,7 +440,7 @@ function drawLoop(loop, exportType, color = "normal") {
     else {
         drawContext.setLineDash([]);
     }
-    drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, 0, Math.PI * 2);
+    drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, loop.loopBeginAngle, loop.loopEndAngle);
     drawContext.stroke();
     if (loop.fill) {
         drawContext.fill();
@@ -967,6 +978,18 @@ class RDDraw {
         if (ev.key == "l") {
             this.putLoop(x, y);
         }
+        if (ev.key == "W") {
+            this.changeArcAngle();
+        }
+        if (ev.key == "X") {
+            this.changeArcAngleMinus();
+        }
+        if (ev.key == "E") {
+            this.changeArcEndAngle();
+        }
+        if (ev.key == "C") {
+            this.changeArcEndAngleMinus();
+        }
         if (ev.key == "t") {
             this.changeType();
         }
@@ -1174,6 +1197,86 @@ class RDDraw {
             return;
         }
         if (isLoop(elem)) {
+            return;
+        }
+    }
+    changeArcAngle() {
+        let elem = this.repository.currentElement();
+        if (!elem) {
+            return;
+        }
+        if (isVector(elem)) {
+            return;
+        }
+        if (isLine(elem)) {
+            return;
+        }
+        if (isLoop(elem)) {
+            elem.loopBeginAngle = elem.loopBeginAngle + (2 * Math.PI) / 36;
+            if (elem.loopBeginAngle >= (2 * Math.PI)) {
+                elem.loopBeginAngle = 0;
+            }
+            this.drawAll();
+            return;
+        }
+    }
+    changeArcAngleMinus() {
+        let elem = this.repository.currentElement();
+        if (!elem) {
+            return;
+        }
+        if (isVector(elem)) {
+            return;
+        }
+        if (isLine(elem)) {
+            return;
+        }
+        if (isLoop(elem)) {
+            elem.loopBeginAngle = elem.loopBeginAngle - (2 * Math.PI) / 36;
+            if (elem.loopBeginAngle < 0) {
+                elem.loopBeginAngle = 2 * Math.PI - (2 * Math.PI) / 36;
+            }
+            this.drawAll();
+            return;
+        }
+    }
+    changeArcEndAngle() {
+        let elem = this.repository.currentElement();
+        if (!elem) {
+            return;
+        }
+        if (isVector(elem)) {
+            return;
+        }
+        if (isLine(elem)) {
+            return;
+        }
+        if (isLoop(elem)) {
+            elem.loopEndAngle = elem.loopEndAngle + (2 * Math.PI) / 36;
+            if (elem.loopEndAngle >= (2 * Math.PI)) {
+                elem.loopEndAngle = 0;
+            }
+            this.drawAll();
+            return;
+        }
+    }
+    changeArcEndAngleMinus() {
+        let elem = this.repository.currentElement();
+        if (!elem) {
+            return;
+        }
+        if (isVector(elem)) {
+            return;
+        }
+        if (isLine(elem)) {
+            return;
+        }
+        if (isLoop(elem)) {
+            elem.loopEndAngle = elem.loopEndAngle - (2 * Math.PI) / 36;
+            if (elem.loopEndAngle < 0) {
+                elem.loopEndAngle = 2 * Math.PI - (2 * Math.PI) / 36;
+            }
+            this.drawAll();
             return;
         }
     }

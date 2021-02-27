@@ -128,7 +128,13 @@ class DrawContext {
         }
 
         if (this.exportType == "tikz") {
-            this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`)
+            const sa = startAngle / (2 * Math.PI) * 360
+            const ea = endAngle / (2 * Math.PI) * 360
+            if ( Math.abs(endAngle - startAngle) ==  2 * Math.PI) {
+                this.addExport(`\\draw (${x},${y}) circle [radius=${radius}];`)
+            } else {
+                this.addExport(`\\draw(${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`)
+            }
             return
         }
     }
@@ -366,6 +372,8 @@ class Loop implements Elem {
     radius: number = 1
     label: string = ""
     labels: LabelInfo[] = []
+    loopBeginAngle: number = 0
+    loopEndAngle:number = Math.PI*2
 
     copy(): Loop {
         let loop = new Loop()
@@ -375,6 +383,8 @@ class Loop implements Elem {
         loop.label = this.label
         loop.labels = this.labels
         loop.style = this.style
+        loop.loopBeginAngle = this.loopBeginAngle
+        loop.loopEndAngle = this.loopEndAngle
         return loop
     }
 
@@ -541,7 +551,7 @@ function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
     }
     drawContext.arc(loop.origin.x,
         loop.origin.y,
-        loop.radius, 0, Math.PI * 2)
+        loop.radius, loop.loopBeginAngle, loop.loopEndAngle)
     drawContext.stroke()
     if (loop.fill) {
         drawContext.fill()
@@ -1187,6 +1197,22 @@ class RDDraw {
             this.putLoop(x, y)
         }
 
+        if (ev.key == "W") {
+            this.changeArcAngle()
+        }
+
+        if (ev.key == "X") {
+            this.changeArcAngleMinus()
+        }
+
+        if (ev.key == "E") {
+            this.changeArcEndAngle()
+        }
+
+        if (ev.key == "C") {
+            this.changeArcEndAngleMinus()
+        }
+
         if (ev.key == "t") {
             this.changeType()
         }
@@ -1439,6 +1465,99 @@ class RDDraw {
             return
         }
     }
+
+    changeArcAngle() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+
+        if (isLine(elem)) {
+            return
+        }
+
+        if (isLoop(elem)) {
+            elem.loopBeginAngle = elem.loopBeginAngle + (2*Math.PI)/36
+            if (elem.loopBeginAngle >= (2 * Math.PI)) {
+                elem.loopBeginAngle = 0
+            }
+            this.drawAll()
+            return
+        }
+    }
+
+    changeArcAngleMinus() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+
+        if (isLine(elem)) {
+            return
+        }
+
+        if (isLoop(elem)) {
+            elem.loopBeginAngle = elem.loopBeginAngle - (2 * Math.PI) / 36
+            if (elem.loopBeginAngle < 0) {
+                elem.loopBeginAngle = 2 * Math.PI - (2 * Math.PI) / 36
+            }
+            this.drawAll()
+            return
+        }
+    }
+
+    changeArcEndAngle() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+
+        if (isLine(elem)) {
+            return
+        }
+
+        if (isLoop(elem)) {
+            elem.loopEndAngle = elem.loopEndAngle + (2 * Math.PI) / 36
+            if (elem.loopEndAngle >= (2 * Math.PI)) {
+                elem.loopEndAngle = 0
+            }
+            this.drawAll()
+            return
+        }
+    }
+
+    changeArcEndAngleMinus() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+
+        if (isLine(elem)) {
+            return
+        }
+
+        if (isLoop(elem)) {
+            elem.loopEndAngle = elem.loopEndAngle - (2 * Math.PI) / 36
+            if (elem.loopEndAngle < 0) {
+                elem.loopEndAngle = 2 * Math.PI - (2 * Math.PI) / 36
+            }
+            this.drawAll()
+            return
+        }
+    }
+
 
     changeScale() {
         let elem = this.repository.currentElement()

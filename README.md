@@ -64,5 +64,7 @@ x: scale down
 
 e: export tikz text
 
+W, X, E, C: arc angle chage
+
 # LICENSE
 MIT
