@@ -309,6 +309,15 @@ class Line implements Elem {
         }
     }
 
+    rotation(angle:number) {
+        let centerOrigin = this.center()
+        let unitVec = this.directionUnit()
+        let length = this.length()
+        let rotatedUnitVec = unitVec.rotation(angle)
+        this.origin = centerOrigin.add(rotatedUnitVec.multi(-length / 2))
+        this.to = centerOrigin.add(rotatedUnitVec.multi(length / 2))
+    }
+
     move(delta: Vector): void {
         this.origin =  this.origin.add(delta)
         this.to = this.to.add(delta)
@@ -1250,6 +1259,14 @@ class RDDraw {
             this.putLoop(x, y)
         }
 
+        if (ev.key == "r") {
+            this.rotation()
+        }
+
+        if (ev.key == "R") {
+            this.antiRotation()
+        }
+
         if (ev.key == "W") {
             console.log("W hit")
             this.changeArcAngle()
@@ -1485,6 +1502,46 @@ class RDDraw {
 
     }
 
+    rotation() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+        if (isLine(elem)) {
+            elem.rotation((2*Math.PI/72))
+            this.drawAll()
+            return
+        }
+        if (isLoop(elem)) {
+            this.changeArcAngle()
+            this.changeArcEndAngle()
+            return
+        }
+    }
+
+    antiRotation() {
+        let elem = this.repository.currentElement()
+        if (!elem) {
+            return
+        }
+        if (isVector(elem)) {
+            return
+        }
+        if (isLine(elem)) {
+            elem.rotation(( -2 * Math.PI / 72))
+            this.drawAll()
+            return
+        }
+        if (isLoop(elem)) {
+            this.changeArcAngleMinus()
+            this.changeArcEndAngleMinus()
+            return
+        }
+    }
+
     allowToggle() {
         let elem = this.repository.currentElement()
         if (!elem) {
@@ -1542,7 +1599,7 @@ class RDDraw {
         }
 
         if (isLoop(elem)) {
-            elem.loopBeginAngle = elem.loopBeginAngle + (2*Math.PI)/36
+            elem.loopBeginAngle = elem.loopBeginAngle + (2*Math.PI)/72
             if (elem.loopBeginAngle >= (2 * Math.PI)) {
                 elem.loopBeginAngle = 0
             }
@@ -1565,9 +1622,9 @@ class RDDraw {
         }
 
         if (isLoop(elem)) {
-            elem.loopBeginAngle = elem.loopBeginAngle - (2 * Math.PI) / 36
+            elem.loopBeginAngle = elem.loopBeginAngle - (2 * Math.PI) / 72
             if (elem.loopBeginAngle < 0) {
-                elem.loopBeginAngle = 2 * Math.PI - (2 * Math.PI) / 36
+                elem.loopBeginAngle = 2 * Math.PI - (2 * Math.PI) / 72
             }
             this.drawAll()
             return
@@ -1588,7 +1645,7 @@ class RDDraw {
         }
 
         if (isLoop(elem)) {
-            elem.loopEndAngle = elem.loopEndAngle + (2 * Math.PI) / 36
+            elem.loopEndAngle = elem.loopEndAngle + (2 * Math.PI) / 72
             if (elem.loopEndAngle >= (2 * Math.PI)) {
                 elem.loopEndAngle = 0
             }
@@ -1611,9 +1668,9 @@ class RDDraw {
         }
 
         if (isLoop(elem)) {
-            elem.loopEndAngle = elem.loopEndAngle - (2 * Math.PI) / 36
+            elem.loopEndAngle = elem.loopEndAngle - (2 * Math.PI) / 72
             if (elem.loopEndAngle < 0) {
-                elem.loopEndAngle = 2 * Math.PI - (2 * Math.PI) / 36
+                elem.loopEndAngle = 2 * Math.PI - (2 * Math.PI) / 72
             }
             this.drawAll()
             return
