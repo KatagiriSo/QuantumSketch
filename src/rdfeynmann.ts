@@ -1198,6 +1198,7 @@ class RDDraw {
         }
 
         if (ev.key == "W") {
+            console.log("W hit")
             this.changeArcAngle()
         }
 
@@ -1467,6 +1468,7 @@ class RDDraw {
     }
 
     changeArcAngle() {
+        console.log("changeArcAngle..")
         let elem = this.repository.currentElement()
         if (!elem) {
             return

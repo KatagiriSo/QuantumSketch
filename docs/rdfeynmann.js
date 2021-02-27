@@ -979,6 +979,7 @@ class RDDraw {
             this.putLoop(x, y);
         }
         if (ev.key == "W") {
+            console.log("W hit");
             this.changeArcAngle();
         }
         if (ev.key == "X") {
@@ -1201,6 +1202,7 @@ class RDDraw {
         }
     }
     changeArcAngle() {
+        console.log("changeArcAngle..");
         let elem = this.repository.currentElement();
         if (!elem) {
             return;
