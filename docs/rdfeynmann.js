@@ -153,7 +153,7 @@ class DrawContext {
     startExport() {
         if (this.exportType == "tikz") {
             this.addExport("\\newcommand{\\myDiagram}{");
-            this.addExport("\\begin{tikzpicture}[scale=0.1]\n");
+            this.addExport("\\begin{tikzpicture}[scale=0.1, baseline=(current bounding box.center)]\n");
         }
     }
     endExport() {
