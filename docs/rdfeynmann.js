@@ -163,15 +163,19 @@ class DrawContext {
         if (this.exportType == "tikz") {
             const sa = startAngle / (2 * Math.PI) * 360;
             const ea = endAngle / (2 * Math.PI) * 360;
-            let dashed = "";
+            let option = "";
             if (loopStyle == "dash") {
-                dashed = "[dashed]";
+                option = "[dashed]";
+            }
+            if (loopStyle == "wave") {
+                // not work..orz
+                option = `[snake = snake, segment amplitude = 0.2mm, segment length = 1mm]`;
             }
             if (Math.abs(endAngle - startAngle) == 2 * Math.PI) {
-                this.addExport(`\\draw ${dashed} (${x},${y}) circle [radius=${radius}];`);
+                this.addExport(`\\draw ${option} (${x},${y}) circle [radius=${radius}];`);
             }
             else {
-                this.addExport(`\\draw ${dashed} (${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`);
+                this.addExport(`\\draw ${option} (${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`);
             }
             return;
         }
@@ -414,7 +418,7 @@ class Loop {
         return this.origin.minus(point).length();
     }
     description() {
-        return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) radius = ${this.radius}) stayle:${this.style}`;
+        return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) radius = ${this.radius} angle = (${this.loopBeginAngle * (360 / (2 * Math.PI))}, ${this.loopEndAngle * (360 / (2 * Math.PI))}) stayle:${this.style}`;
     }
 }
 class Vertex extends Loop {
@@ -529,12 +533,82 @@ function drawAllow(line, exportType, color = "normal") {
     drawContext.fill();
     drawContext.stroke();
 }
+function drawWaveLoop(loop, exportType, color = "normal") {
+    // drawContext.beginPath()
+    let origin = loop.origin;
+    let radius = loop.radius;
+    let beginAngle = loop.loopBeginAngle;
+    let endAngle = loop.loopEndAngle;
+    const segmentNum = 360 * (radius / 2);
+    const segmentAngleWith = (Math.PI * 2) / segmentNum;
+    const snakeNum = 12;
+    const amplitude = 0.1 * radius;
+    if (beginAngle < 0) {
+        beginAngle += (Math.PI * 2);
+    }
+    if (beginAngle > (Math.PI * 2)) {
+        beginAngle -= Math.PI * 2;
+    }
+    if (endAngle < 0) {
+        endAngle += (Math.PI * 2);
+    }
+    if (endAngle > (Math.PI * 2)) {
+        endAngle -= Math.PI * 2;
+    }
+    if (beginAngle > endAngle) {
+        endAngle += Math.PI * 2;
+    }
+    for (let angle = beginAngle; angle < endAngle; angle = angle + segmentAngleWith) {
+        let unitVec = new Vector(1, 0).rotation(angle);
+        let unitVec2 = new Vector(1, 0).rotation(angle + segmentAngleWith);
+        let snake = amplitude * Math.sin(angle * snakeNum);
+        // let perpVec = unitVec.rotation(Math.PI / 2)
+        let startPoint = origin.add(unitVec.multi(radius + snake));
+        let endPoint = origin.add(unitVec2.multi(radius + snake));
+        let line = new Line();
+        line.style = "normal";
+        line.origin = startPoint;
+        line.to = endPoint;
+        line.allow = false;
+        drawLine(line, exportType, color);
+    }
+    // drawContext.setStrokeColor(color)
+    // // context.arc(100, 10, 50, 0, Math.PI * 2)
+    // let lineSyle: LineStyle = "normal"
+    // if (line.style == "dash") {
+    //     lineSyle = "dash"
+    // }
+    // drawContext.moveTo(origin.x, origin.y)
+    // for (let l = 0; l < line.length(); l += 0.1) {
+    //     let x = origin.x + unitVec.x * l + perpVec.x * Math.sin(l * 5) * 3 / 15
+    //     let y = origin.y + unitVec.y * l + perpVec.y * Math.sin(l * 5) * 3 / 15
+    //     loggerVer(`draw ${l} ${x} ${y}`)
+    //     drawContext.lineTo(x, y, lineSyle)
+    //     drawContext.moveTo(x, y)
+    //     drawContext.stroke()
+    // }
+    // if (line.allow) {
+    //     drawAllow(line, exportType)
+    // }
+    // drawContext.closePath()
+    // drawContext.setLineDash([])
+}
 function drawLoop(loop, exportType, color = "normal") {
+    if (loop.style == "wave") {
+        ///MARK: not good
+        if (exportType == "canvas" || exportType == "tikz") {
+            drawWaveLoop(loop, exportType, color);
+            return;
+        }
+    }
     drawContext.beginPath();
     drawContext.setStrokeColor(color);
     let lineStyle = "normal";
     if (loop.style == "dash") {
         lineStyle = "dash";
+    }
+    if (loop.style == "wave") {
+        lineStyle = "wave";
     }
     drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, loop.loopBeginAngle, loop.loopEndAngle, lineStyle);
     drawContext.stroke();
@@ -1307,7 +1381,7 @@ class RDDraw {
             return;
         }
         if (isLine(elem)) {
-            elem.rotation((2 * Math.PI / 72));
+            elem.rotation((2 * Math.PI / 360));
             this.drawAll();
             return;
         }
@@ -1531,6 +1605,11 @@ class RDDraw {
                 return;
             }
             if (elem.style == "dash") {
+                elem.style = "wave";
+                this.drawAll();
+                return;
+            }
+            if (elem.style == "wave") {
                 elem.style = "normal";
                 this.drawAll();
                 return;
