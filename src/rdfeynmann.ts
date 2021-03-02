@@ -201,21 +201,42 @@ class DrawContext {
         }
 
         if (this.exportType == "tikz") {            
-            const sa = startAngle / (2 * Math.PI) * 360
-            const ea = endAngle / (2 * Math.PI) * 360
+            let sa = startAngle / (2 * Math.PI) * 360
+            let ea = endAngle / (2 * Math.PI) * 360
+
+
+            if (sa < 0) {
+                sa += 360
+            }
+            if (sa > 360 ) {
+                sa -= 360
+            }
+
+            if (ea < 0) {
+                ea += 360
+            }
+            if (ea > 360) {
+                ea -= 360
+            }
+
+            if (sa > ea) {
+                ea += 360
+
+            }
+
+
             let option = ""
             if (loopStyle == "dash") {
                 option = "[dashed]"
             }
             if (loopStyle == "wave") {
-                // not work..orz
-                option = `[snake = snake, segment amplitude = 0.2mm, segment length = 1mm]`
+                option = `[decorate, decoration={snake, amplitude = 0.2mm, segment length = 1mm}]`
             }
 
             if ( Math.abs(endAngle - startAngle) ==  2 * Math.PI) {
                 this.addExport(`\\draw ${option} (${x},${y}) circle [radius=${radius}];`)
             } else {
-                this.addExport(`\\draw ${option} (${x}, ${y}) arc [radius=${radius}, start angle=${sa} end angle=${ea}]`)
+                this.addExport(`\\draw ${option} ([shift=(${sa}:${radius})]${x}, ${y}) arc [radius=${radius}, start angle=${sa}, end angle=${ea}];`)
             }
             return
         }
@@ -762,7 +783,7 @@ function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
 
     if (loop.style == "wave") {
         ///MARK: not good
-        if (exportType == "canvas" || exportType == "tikz") {
+        if (exportType == "canvas") {
             drawWaveLoop(loop, exportType, color)
             return
         }
