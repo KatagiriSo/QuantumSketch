@@ -95,7 +95,7 @@ class DrawContext {
         }
     }
 
-    moveTo(x:number, y:number) {
+    moveTo(x: number, y: number) {
         this.coordinate = new Vector(x, y)
     }
 
@@ -120,8 +120,10 @@ class DrawContext {
         this.exportString += txt
     }
 
-    lineTo(x: number, y: number, linestyle:LineStyle) {
+    lineTo(x: number, y_: number, linestyle: LineStyle) {
         if (this.exportType == "canvas") {
+            let y = y_
+
             if (linestyle == "dash") {
                 this.canvasContext.setLineDash([2,2])
             } else {
@@ -136,15 +138,17 @@ class DrawContext {
         }
 
         if (this.exportType == "tikz") {
+            let y = -y_
+
             if (linestyle == "wave") {
-                this.addExport(`\\draw [snake=snake, segment amplitude=0.2mm,segment length=1mm](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+                this.addExport(`\\draw [snake=snake, segment amplitude=0.2mm,segment length=1mm](${this.coordinate.x},${ - this.coordinate.y}) -- (${x},${y});\n`)
                 return
             }
 
             if (linestyle == "dash") {
-                this.addExport(`\\draw [dashed](${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+                this.addExport(`\\draw [dashed](${this.coordinate.x},${- this.coordinate.y}) -- (${x},${y});\n`)
             } else {
-                this.addExport(`\\draw (${this.coordinate.x},${this.coordinate.y}) -- (${x},${y});\n`)
+                this.addExport(`\\draw (${this.coordinate.x},${- this.coordinate.y}) -- (${x},${y});\n`)
             }
             return
         }
@@ -154,8 +158,9 @@ class DrawContext {
 
     }
 
-    fillRect(x:number,y:number,w:number,h:number) {
+    fillRect(x:number,y_:number,w:number,h:number) {
         if (this.exportType == "canvas") {
+            let y = y_
             loggerVer(`fillRect${x} ${y} ${w} ${h}`)
             this.canvasContext.fillRect(x * this.scale, y * this.scale, w * this.scale, h * this.scale)
             return
@@ -187,10 +192,17 @@ class DrawContext {
             this.canvasContext.fillText(txt, x * this.scale, y * this.scale)
             return
         }
+        if (this.exportType == "tikz") {
+            // \node[align=left] at (19,19) {\tiny $\int dx y^2$};
+            this.addExport(`\\node[align=left] at (${x},${-y}) {\\tiny $${txt}$};`)
+            return
+        }
     }
 
-    arc(x: number, y: number, radius: number, startAngle: number, endAngle: number, loopStyle:LineStyle) {
+    arc(x: number, y_: number, radius: number, startAngle: number, endAngle: number, loopStyle: LineStyle) {
+
         if (this.exportType == "canvas") {
+            let y = y_
             if (loopStyle == "dash") {
                 this.canvasContext.setLineDash([2,2])
             } else {
@@ -200,9 +212,11 @@ class DrawContext {
             return
         }
 
-        if (this.exportType == "tikz") {            
-            let sa = startAngle / (2 * Math.PI) * 360
-            let ea = endAngle / (2 * Math.PI) * 360
+        if (this.exportType == "tikz") {  
+            let y = -y_
+
+            let sa = startAngle / (2 * Math.PI) * 360 - 180
+            let ea = endAngle / (2 * Math.PI) * 360 - 180
 
 
             if (sa < 0) {
