@@ -6,7 +6,7 @@ let context_ = canvas.getContext("2d");
 let config = {
     /// lattice size
     scale: 15,
-    log: "ON"
+    log: "VER"
 };
 function loggerVer(text) {
     if (config.log == "VER") {
@@ -153,7 +153,7 @@ class DrawContext {
         }
         if (this.exportType == "tikz") {
             // \node[align=left] at (19,19) {\tiny $\int dx y^2$};
-            this.addExport(`\\node[align=left] at (${x},${-y}) {\\tiny $${txt}$};`);
+            this.addExport(`\\node[align=left] at (${x},${-y}) {\\scalebox{0.3} { $${txt}$}};`);
             return;
         }
     }
@@ -171,22 +171,24 @@ class DrawContext {
         }
         if (this.exportType == "tikz") {
             let y = -y_;
-            let sa = startAngle / (2 * Math.PI) * 360 - 180;
-            let ea = endAngle / (2 * Math.PI) * 360 - 180;
-            if (sa < 0) {
-                sa += 360;
-            }
-            if (sa > 360) {
-                sa -= 360;
-            }
-            if (ea < 0) {
-                ea += 360;
-            }
-            if (ea > 360) {
-                ea -= 360;
-            }
-            if (sa > ea) {
-                ea += 360;
+            let ea = (-startAngle / (2 * Math.PI) * 360);
+            let sa = (-endAngle / (2 * Math.PI) * 360);
+            for (let n = 0; n < 2; n++) {
+                if (sa < 0) {
+                    sa += 360;
+                }
+                if (sa > 360) {
+                    sa -= 360;
+                }
+                if (ea < 0) {
+                    ea += 360;
+                }
+                if (ea > 360) {
+                    ea -= 360;
+                }
+                if (sa > ea) {
+                    ea += 360;
+                }
             }
             let option = "";
             if (loopStyle == "dash") {
@@ -236,6 +238,9 @@ function isLoop(elem) {
 }
 function isLine(elem) {
     return elem.shape == "Line";
+}
+function isString(elem) {
+    return elem.shape == "String";
 }
 class Vector {
     constructor(x, y) {
@@ -835,6 +840,11 @@ class RDRepository {
         this.idCount = 0;
         this.history = [];
     }
+    getElement(id) {
+        return this.elements.find((elem) => {
+            return elem.id == id;
+        });
+    }
     currentElement() {
         // loggerVer("currentElement:length:"+this.elements.length)
         // loggerVer("currentIndex:"+this.currentIndex)
@@ -1140,38 +1150,62 @@ class RDDraw {
         const scale = config.scale;
         const x = Math.floor(this.prevX / scale);
         const y = Math.floor(this.prevY / scale);
-        if (this.stringMode != undefined) {
-            if (ev.key == "/" || ev.key == "Enter") {
-                // let current = this.repository.currentElement()
-                // if (current && isLine(current)) {
-                //     current.label = this.stringMode
-                //     this.stringMode = undefined
-                //     loggerVer("stringMode OUT")
-                //     this.drawAll()
-                //     return
-                // }
-                // if (current && isLoop(current)) {
-                //     current.label = this.stringMode
-                //     this.stringMode = undefined
-                //     loggerVer("stringMode OUT")
-                //     this.drawAll()
-                //     return
-                // }
-                let str = new MyString(this.stringMode);
-                str.origin = new Vector(x, y);
-                this.repository.doCommand(new SetString(str));
-                this.stringMode = undefined;
-                loggerVer("stringMode OUT");
-                this.drawAll();
+        // if (this.stringMode != undefined) {
+        //     if (ev.key == "/" || ev.key == "Enter") {
+        //         // let current = this.repository.currentElement()
+        //         // if (current && isLine(current)) {
+        //         //     current.label = this.stringMode
+        //         //     this.stringMode = undefined
+        //         //     loggerVer("stringMode OUT")
+        //         //     this.drawAll()
+        //         //     return
+        //         // }
+        //         // if (current && isLoop(current)) {
+        //         //     current.label = this.stringMode
+        //         //     this.stringMode = undefined
+        //         //     loggerVer("stringMode OUT")
+        //         //     this.drawAll()
+        //         //     return
+        //         // }
+        //         // let str = new MyString(this.stringMode)
+        //         // str.origin = new Vector(x, y)
+        //         // this.repository.doCommand(new SetString(str))
+        //         this.stringMode = undefined
+        //         loggerVer("stringMode OUT")
+        //         this.drawAll()
+        //         return
+        //     }
+        //     let elem = this.repository.getElement(this.stringMode)
+        //     if (!elem) {
+        //         return
+        //     }
+        //     if (isString(elem)) {
+        //         elem.label = elem.label + ev.key 
+        //         loggerVer("stringMode:" + elem.label)
+        //         this.drawAll()
+        //         return
+        //     }
+        //     return
+        // }
+        // if (ev.key == "/") {
+        //     loggerVer("stringMode In")
+        //     let str = new MyString("")
+        //     str.origin = new Vector(x, y)
+        //     let command = new SetString(str)
+        //     this.repository.doCommand(command)
+        //     this.stringMode = command.copyMyString.id
+        //     return
+        // }
+        if (ev.key == "/") {
+            let text = window.prompt("input text( ex. \\int e^x dx)");
+            if (text == null) {
                 return;
             }
-            this.stringMode = this.stringMode + ev.key;
-            loggerVer("stringMode:" + this.stringMode);
-            return;
-        }
-        if (ev.key == "/") {
-            loggerVer("stringMode In");
-            this.stringMode = "";
+            let str = new MyString(text);
+            str.origin = new Vector(x, y);
+            let command = new SetString(str);
+            this.repository.doCommand(command);
+            this.drawAll();
             return;
         }
         if (ev.key == "e") {
