@@ -1196,6 +1196,11 @@ class RDDraw {
         //     this.stringMode = command.copyMyString.id
         //     return
         // }
+        if (ev.ctrlKey && ev.key == "c") {
+            this.copy();
+            loggerOn("crt + c");
+            return;
+        }
         if (ev.key == "/") {
             let text = window.prompt("input text( ex. \\int e^x dx)");
             if (text == null) {
@@ -1210,82 +1215,107 @@ class RDDraw {
         }
         if (ev.key == "e") {
             this.drawAll("tikz");
+            return;
         }
         if (ev.key == "v") {
             this.putVertex(new Vector(x, y));
+            return;
         }
         if (ev.key == "n") {
             this.nextElem();
+            return;
         }
         if (ev.key == "b") {
             this.preElem();
+            return;
         }
         if (ev.key == "s") {
             this.nextSubElem();
+            return;
         }
         if (ev.key == "a") {
             this.preSubElem();
+            return;
         }
         if (ev.key == "p") {
             this.putLine();
+            return;
         }
         if (ev.key == "l") {
             this.putLoop(x, y);
+            return;
         }
         if (ev.key == "r") {
             this.rotation();
+            return;
         }
         if (ev.key == "R") {
             this.antiRotation();
+            return;
         }
         if (ev.key == "W") {
-            loggerVer("W hit");
             this.changeArcAngle();
+            return;
         }
         if (ev.key == "X") {
             this.changeArcAngleMinus();
+            return;
         }
         if (ev.key == "E") {
             this.changeArcEndAngle();
+            return;
         }
         if (ev.key == "C") {
             this.changeArcEndAngleMinus();
+            return;
         }
         if (ev.key == "t") {
             this.changeType();
+            return;
         }
         if (ev.key == "q") {
             this.changeStyle();
+            return;
         }
         if (ev.key == "d") {
             this.delete();
+            return;
         }
         if (ev.key == "@") {
             this.allowToggle();
+            return;
         }
         if (ev.key == "c") {
             this.changeSelect();
+            return;
         }
         if (ev.key == "z") {
             this.noSelectMode();
+            return;
         }
         if (ev.key == "8") {
             this.keyUp();
+            return;
         }
         if (ev.key == "6") {
             this.keyRight();
+            return;
         }
         if (ev.key == "4") {
             this.keyLeft();
+            return;
         }
         if (ev.key == "2") {
             this.keyDown();
+            return;
         }
         if (ev.key == "w") {
             this.changeScale();
+            return;
         }
         if (ev.key == "x") {
             this.changeScaleDown();
+            return;
         }
     }
     drag(ev) {
@@ -1426,6 +1456,34 @@ class RDDraw {
             line.origin = sub;
             current.addLineTo(line);
             this.repository.doCommand(new SetLine(line));
+            this.drawAll();
+            return;
+        }
+    }
+    copy() {
+        let elem = this.repository.currentElement();
+        if (elem == undefined) {
+            return;
+        }
+        let copied = elem.copy();
+        copied.move(new Vector(0.1, 0.1));
+        if (isLine(copied)) {
+            this.repository.doCommand(new SetLine(copied));
+            this.drawAll();
+            return;
+        }
+        if (isLoop(copied)) {
+            this.repository.doCommand(new SetLoop(copied));
+            this.drawAll();
+            return;
+        }
+        if (isString(copied)) {
+            this.repository.doCommand(new SetString(copied));
+            this.drawAll();
+            return;
+        }
+        if (isVector(copied)) {
+            this.repository.doCommand(new SetVertex(copied));
             this.drawAll();
             return;
         }
