@@ -510,7 +510,7 @@ class Line implements Elem {
 
     formalDistance(point: Vector): number {
         let perp_unit = this.directionUnit().rotation(Math.PI / 2)
-        let diff = this.origin.minus(point)
+        let diff = point.minus(this.origin)
         return Math.abs(diff.prod(perp_unit))
 
 
@@ -1167,7 +1167,9 @@ class RDRepository {
         this.vertex.set(`${vertex.x}_${vertex.y}`, vertex)
         this.vertexList.push(vertex)
         this.elements.push(vertex)
+        const currentIndex = this.currentIndex
         this.currentIndex = this.elements.length - 1
+        this.currentSubIndex = currentIndex
         loggerVer("currentIndex"+ this.currentIndex)
     }
 
@@ -1279,7 +1281,9 @@ class RDRepository {
                 }
             }
         }
+        const currenIndex = this.currentIndex
         this.currentIndex = findIndex
+        this.currentSubIndex = currenIndex
     }
 
     subSelect(point: Vector) {
@@ -1788,6 +1792,7 @@ class RDDraw {
             line.origin = sub
             line.to = current
             this.repository.doCommand(new SetLine(line))
+            this.repository.select(current)
             this.drawAll()
             return
         }
