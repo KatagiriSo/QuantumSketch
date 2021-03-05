@@ -263,6 +263,9 @@ class Vector {
     multi(num) {
         return new Vector(this.x * num, this.y * num);
     }
+    prod(vec) {
+        return this.x * vec.x + this.y * vec.y;
+    }
     unit() {
         return new Vector(this.x * (1 / this.length()), this.y * (1 / this.length()));
     }
@@ -386,18 +389,21 @@ class Line {
         return this.origin.add(this.to).multi(1 / 2);
     }
     formalDistance(point) {
-        let toLength = this.to.minus(point).length();
-        let originLength = this.origin.minus(point).length();
-        if (toLength < originLength) {
-            if (toLength > 2) {
-                return toLength;
-            }
-            return toLength + 1;
-        }
-        if (originLength > 2) {
-            return originLength;
-        }
-        return originLength + 1;
+        let perp_unit = this.directionUnit().rotation(Math.PI / 2);
+        let diff = this.origin.minus(point);
+        return Math.abs(diff.prod(perp_unit));
+        // let toLength = this.to.minus(point).length()
+        // let originLength = this.origin.minus(point).length()
+        // if (toLength < originLength) {
+        //     if (toLength > 2) {
+        //         return toLength
+        //     }
+        //     return toLength + 1
+        // }
+        // if (originLength > 2) {
+        //     return originLength
+        // }
+        // return originLength + 1
     }
     description() {
         return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) -> (${this.to.x}, ${this.to.y}) stayle:${this.style}`;

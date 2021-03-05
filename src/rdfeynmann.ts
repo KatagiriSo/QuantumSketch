@@ -351,6 +351,11 @@ class Vector implements Elem {
     multi(num: number): Vector {
         return new Vector(this.x * num, this.y * num)
     }
+
+    prod(vec: Vector): number {
+        return this.x * vec.x + this.y * vec.y
+    }
+
     unit(): Vector {
         return new Vector(this.x * (1 / this.length()), this.y * (1 / this.length()))
     }
@@ -504,18 +509,23 @@ class Line implements Elem {
     }
 
     formalDistance(point: Vector): number {
-        let toLength = this.to.minus(point).length()
-        let originLength = this.origin.minus(point).length()
-        if (toLength < originLength) {
-            if (toLength > 2) {
-                return toLength
-            }
-            return toLength + 1
-        }
-        if (originLength > 2) {
-            return originLength
-        }
-        return originLength + 1
+        let perp_unit = this.directionUnit().rotation(Math.PI / 2)
+        let diff = this.origin.minus(point)
+        return Math.abs(diff.prod(perp_unit))
+
+
+        // let toLength = this.to.minus(point).length()
+        // let originLength = this.origin.minus(point).length()
+        // if (toLength < originLength) {
+        //     if (toLength > 2) {
+        //         return toLength
+        //     }
+        //     return toLength + 1
+        // }
+        // if (originLength > 2) {
+        //     return originLength
+        // }
+        // return originLength + 1
 
     }
 
