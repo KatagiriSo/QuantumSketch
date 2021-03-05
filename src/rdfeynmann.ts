@@ -1512,15 +1512,7 @@ class RDDraw {
         }
 
         if (ev.key == "/") {
-            let text = window.prompt("input text( ex. \\int e^x dx)")
-            if (text == null) {
-                return
-            }
-            let str = new MyString(text)
-            str.origin = new Vector(x, y)
-            let command = new SetString(str)
-            this.repository.doCommand(command)
-            this.drawAll()
+            this.setString(x, y)
             return
         }
 
@@ -1719,6 +1711,32 @@ class RDDraw {
         this.drawAll()
     }
 
+    setString(x:number, y:number) {
+        let current = this.repository.currentElement()
+        let defult = ""
+        if (current && isString(current)) {
+            defult = current.label
+        }
+
+        let text = window.prompt("input text( ex. \\int e^x dx)", defult)
+
+        if (text == null) {
+            return
+        }
+
+        if (current && isString(current)) {
+            current.label = text
+            this.drawAll()
+            return
+        }
+
+        let str = new MyString(text)
+        str.origin = new Vector(x, y)
+        let command = new SetString(str)
+        this.repository.doCommand(command)
+        this.drawAll()
+
+    }
 
     putVertex(vertex: Vector) {
         loggerVer("put vertex..")
