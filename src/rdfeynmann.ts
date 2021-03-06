@@ -368,7 +368,11 @@ class Vector implements Elem {
     }
 
     formalDistance(point: Vector): number {
-        return this.minus(point).length()
+        let length = this.minus(point).length()
+        if (length > 0.3) {
+            return Number.MAX_VALUE
+        }
+        return 0
     }
 
     move(delta: Vector): void {
@@ -590,7 +594,11 @@ class Loop implements Elem {
 
 
     formalDistance(point: Vector): number {
-        return this.origin.minus(point).length()
+        let length = this.origin.minus(point).length()
+        if (length < this.radius) {
+            return 0
+        }
+        return Number.MAX_VALUE
     }
 
     description(): string {
@@ -1264,6 +1272,7 @@ class RDRepository {
         }
         let findIndex = 0
         let current = this.currentElement()
+        let currentDistance = Number.MAX_VALUE
         for (let index = 0; index < this.elements.length; index++) {
             if (!current) {
                 findIndex = index
@@ -1272,14 +1281,18 @@ class RDRepository {
             }
             let indexElement = this.elements[index]
             let indexDistance = indexElement.formalDistance(point)
-            let currentDistance = current.formalDistance(point)
             if (indexDistance <= currentDistance && this.currentIndex != index) {
                 if (/*this.selectCount <= 1 || this.currentSubIndex != index*/true) {
                     loggerVer(`near:${findIndex}`)
                     findIndex = index
                     current = indexElement
+                    currentDistance = indexDistance
                 }
             }
+        }
+        if (currentDistance == Number.MAX_VALUE) {
+            this.currentIndex = undefined
+            return
         }
         const currenIndex = this.currentIndex
         this.currentIndex = findIndex
