@@ -154,9 +154,12 @@ class DrawContext {
         }
     }
 
-    fill() {
-
-    }
+    // fill() {
+    //     if (this.exportType == "canvas") {
+    //         this.canvasContext.fill()
+    //         return
+    //     }
+    // }
 
     fillRect(x:number,y_:number,w:number,h:number) {
         if (this.exportType == "canvas") {
@@ -199,7 +202,7 @@ class DrawContext {
         }
     }
 
-    arc(x: number, y_: number, radius: number, startAngle: number, endAngle: number, loopStyle: LineStyle) {
+    arc(x: number, y_: number, radius: number, startAngle: number, endAngle: number, loopStyle: LineStyle, fill:boolean) {
 
         if (this.exportType == "canvas") {
             let y = y_
@@ -209,6 +212,9 @@ class DrawContext {
                 this.canvasContext.setLineDash([])
             }
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle)
+            if (fill) {
+                this.canvasContext.fill()
+            }
             return
         }
 
@@ -250,10 +256,15 @@ class DrawContext {
                 option = `[decorate, decoration={snake, amplitude = 0.2mm, segment length = 1mm}]`
             }
 
+            let command = `\\draw`
+            if (fill) {
+                command = `\\fill`
+            }
+
             if ( Math.abs(endAngle - startAngle) ==  2 * Math.PI) {
-                this.addExport(`\\draw ${option} (${x},${y}) circle [radius=${radius}];`)
+                this.addExport(`${command} ${option} (${x},${y}) circle [radius=${radius}];`)
             } else {
-                this.addExport(`\\draw ${option} ([shift=(${sa}:${radius})]${x}, ${y}) arc [radius=${radius}, start angle=${sa}, end angle=${ea}];`)
+                this.addExport(`${command} ${option} ([shift=(${sa}:${radius})]${x}, ${y}) arc [radius=${radius}, start angle=${sa}, end angle=${ea}];`)
             }
             return
         }
@@ -737,7 +748,6 @@ function drawAllow(line: Line, exportType: ExportType,  color: Color = "normal")
     drawContext.lineTo(tail2.x, tail2.y, "normal")
     drawContext.closePath()
     // context.arc(100, 10, 50, 0, Math.PI * 2)
-    drawContext.fill()
     drawContext.stroke()
 }
 
@@ -832,6 +842,7 @@ function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
 
     drawContext.beginPath()
     drawContext.setStrokeColor(color)
+    drawContext.setFillColor(color)
     let lineStyle:LineStyle = "normal"
     if (loop.style == "dash") {
         lineStyle = "dash"
@@ -842,11 +853,9 @@ function drawLoop(loop: Loop, exportType: ExportType, color: Color = "normal") {
 
     drawContext.arc(loop.origin.x,
         loop.origin.y,
-        loop.radius, loop.loopBeginAngle, loop.loopEndAngle, lineStyle)
+        loop.radius, loop.loopBeginAngle, loop.loopEndAngle, lineStyle, loop.fill)
     drawContext.stroke()
-    if (loop.fill) {
-        drawContext.fill()
-    }
+
     if (loop.label) {
         let position = textPosition(loop.label, loop.origin, config)
         drawContext.fillText(loop.label, position.x, position.y)
@@ -1534,6 +1543,10 @@ class RDDraw {
             return
         }
 
+        if (ev.key == "f") {
+            this.fill(x,y)
+        }
+
 
         if (ev.key == "v") {
             this.putVertex(new Vector(x, y))
@@ -1722,6 +1735,16 @@ class RDDraw {
     preSubElem() {
         this.repository.preSubElem()
         this.drawAll()
+    }
+
+    fill(x: number, y: number) {
+        let current = this.repository.currentElement()
+        if (current && isLoop(current)) {
+            current.fill = !current.fill
+            this.drawAll()
+            return
+        }
+        return
     }
 
     setString(x:number, y:number) {

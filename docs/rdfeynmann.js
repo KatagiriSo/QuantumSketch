@@ -121,8 +121,12 @@ class DrawContext {
             return;
         }
     }
-    fill() {
-    }
+    // fill() {
+    //     if (this.exportType == "canvas") {
+    //         this.canvasContext.fill()
+    //         return
+    //     }
+    // }
     fillRect(x, y_, w, h) {
         if (this.exportType == "canvas") {
             let y = y_;
@@ -157,7 +161,7 @@ class DrawContext {
             return;
         }
     }
-    arc(x, y_, radius, startAngle, endAngle, loopStyle) {
+    arc(x, y_, radius, startAngle, endAngle, loopStyle, fill) {
         if (this.exportType == "canvas") {
             let y = y_;
             if (loopStyle == "dash") {
@@ -167,6 +171,9 @@ class DrawContext {
                 this.canvasContext.setLineDash([]);
             }
             this.canvasContext.arc(x * this.scale, y * this.scale, radius * this.scale, startAngle, endAngle);
+            if (fill) {
+                this.canvasContext.fill();
+            }
             return;
         }
         if (this.exportType == "tikz") {
@@ -197,11 +204,15 @@ class DrawContext {
             if (loopStyle == "wave") {
                 option = `[decorate, decoration={snake, amplitude = 0.2mm, segment length = 1mm}]`;
             }
+            let command = `\\draw`;
+            if (fill) {
+                command = `\\fill`;
+            }
             if (Math.abs(endAngle - startAngle) == 2 * Math.PI) {
-                this.addExport(`\\draw ${option} (${x},${y}) circle [radius=${radius}];`);
+                this.addExport(`${command} ${option} (${x},${y}) circle [radius=${radius}];`);
             }
             else {
-                this.addExport(`\\draw ${option} ([shift=(${sa}:${radius})]${x}, ${y}) arc [radius=${radius}, start angle=${sa}, end angle=${ea}];`);
+                this.addExport(`${command} ${option} ([shift=(${sa}:${radius})]${x}, ${y}) arc [radius=${radius}, start angle=${sa}, end angle=${ea}];`);
             }
             return;
         }
@@ -573,7 +584,6 @@ function drawAllow(line, exportType, color = "normal") {
     drawContext.lineTo(tail2.x, tail2.y, "normal");
     drawContext.closePath();
     // context.arc(100, 10, 50, 0, Math.PI * 2)
-    drawContext.fill();
     drawContext.stroke();
 }
 function drawWaveLoop(loop, exportType, color = "normal") {
@@ -646,6 +656,7 @@ function drawLoop(loop, exportType, color = "normal") {
     }
     drawContext.beginPath();
     drawContext.setStrokeColor(color);
+    drawContext.setFillColor(color);
     let lineStyle = "normal";
     if (loop.style == "dash") {
         lineStyle = "dash";
@@ -653,11 +664,8 @@ function drawLoop(loop, exportType, color = "normal") {
     if (loop.style == "wave") {
         lineStyle = "wave";
     }
-    drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, loop.loopBeginAngle, loop.loopEndAngle, lineStyle);
+    drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, loop.loopBeginAngle, loop.loopEndAngle, lineStyle, loop.fill);
     drawContext.stroke();
-    if (loop.fill) {
-        drawContext.fill();
-    }
     if (loop.label) {
         let position = textPosition(loop.label, loop.origin, config);
         drawContext.fillText(loop.label, position.x, position.y);
@@ -1232,6 +1240,9 @@ class RDDraw {
             this.drawAll("tikz");
             return;
         }
+        if (ev.key == "f") {
+            this.fill(x, y);
+        }
         if (ev.key == "v") {
             this.putVertex(new Vector(x, y));
             return;
@@ -1385,6 +1396,15 @@ class RDDraw {
     preSubElem() {
         this.repository.preSubElem();
         this.drawAll();
+    }
+    fill(x, y) {
+        let current = this.repository.currentElement();
+        if (current && isLoop(current)) {
+            current.fill = !current.fill;
+            this.drawAll();
+            return;
+        }
+        return;
     }
     setString(x, y) {
         let current = this.repository.currentElement();
