@@ -1,6 +1,8 @@
 # RDFeynmann
 
-This is a Feynmann Diagram editor.
+This is a Feynman Diagram editor.
+Draw Feynman Diagram in the web browser,
+and export Tikz text.
 
 ![Demo mov](demo.gif)
 
@@ -9,6 +11,8 @@ This is a Feynmann Diagram editor.
 ![sample png](sample.png)
 
 ![sample2 png](sample2.png)
+
+![sample3 png](sample3.png)
 
 
 # Usage
