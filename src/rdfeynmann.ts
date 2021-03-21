@@ -170,9 +170,9 @@ class DrawContext {
 
                     n = Math.floor(pathLength / segmentLength)
                     coilNTimesLength = 2 * aspect * amplitude +
-                                                     (n + 1 / 2) * segmentLength
+                                                     (n - 1 / 2) * segmentLength
                     effectiveSegmentLength = segmentLength +
-                                             (pathLength - coilNTimesLength) / n
+                                   (pathLength - coilNTimesLength) / (n - 1 / 2)
 
                     this.addExport(
                         `\\draw[decorate, decoration={coil,`
@@ -316,9 +316,9 @@ class DrawContext {
 
                     n = Math.floor(pathLength / segmentLength)
                     coilNTimesLength = 2 * aspect * amplitude +
-                                                     (n + 1 / 2) * segmentLength
+                                                     (n - 1 / 2) * segmentLength
                     effectiveSegmentLength = segmentLength +
-                                             (pathLength - coilNTimesLength) / n
+                                   (pathLength - coilNTimesLength) / (n - 1 / 2)
                     option = `[decorate, decoration={coil,`
                            + `amplitude = ${amplitude}mm,`
                            + `segment length = ${effectiveSegmentLength}mm,`
@@ -815,7 +815,7 @@ function drawCoilLine(line: Line, exportType: ExportType, color: Color = "normal
 
             // 弧長sから位相tへ
             const t = (s: number): number => {
-                return (s / pathLength) * (n + 1 / 2) * 2 * Math.PI }
+                return (s / pathLength) * (n - 1 / 2) * 2 * Math.PI }
 
             u = (s) => {
                 // 第2項は両端を閉じるための補正。経路の中間点で0。
@@ -1066,7 +1066,7 @@ function drawCoilLoop(loop: Loop, exportType: ExportType, color: Color = "normal
 
             // 弧長sから位相tへ
             const t = (s: number): number => {
-                return (s / pathLength) * (n + 1 / 2) * 2 * Math.PI }
+                return (s / pathLength) * (n - 1 / 2) * 2 * Math.PI }
 
             u = (s) => {
                 // 第2項は両端を閉じるための補正。経路の中間点で0。
@@ -1108,7 +1108,7 @@ function drawCoilLoop(loop: Loop, exportType: ExportType, color: Color = "normal
     g = y
     drawContext.beginPath()
     {
-        let x: number, y: number, s : number
+        let x: number, y: number, s: number
 
         x = f(begin), y = g(begin)
         drawContext.moveTo(x, y)
