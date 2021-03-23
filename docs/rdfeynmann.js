@@ -112,6 +112,38 @@ class DrawContext {
                 this.addExport(`\\draw [snake=snake, segment amplitude=0.2mm,segment length=1mm](${this.coordinate.x},${-this.coordinate.y}) -- (${x},${y});\n`);
                 return;
             }
+            if (linestyle == "coil") {
+                // コイル線のパラメータ
+                const segmentLength = 1.0;
+                const aspect = 0.9;
+                const amplitude = 0.5;
+                let from, to;
+                let pathLength;
+                from = new Vector(this.coordinate.x, -this.coordinate.y);
+                to = new Vector(x, -y_);
+                pathLength = to.minus(from).length();
+                // 経路の長さが1波長(segmentLength)よりも短い場合、線の装飾をしない。
+                if (pathLength < segmentLength) {
+                    this.addExport(`\\draw(${from.x},${from.y}) -- (${to.x},${to.y});\n`);
+                }
+                else {
+                    let n;
+                    let coilNTimesLength;
+                    let effectiveSegmentLength;
+                    n = Math.floor(pathLength / segmentLength);
+                    coilNTimesLength = 2 * aspect * amplitude +
+                        (n - 1 / 2) * segmentLength;
+                    effectiveSegmentLength = segmentLength +
+                        (pathLength - coilNTimesLength) / (n - 1 / 2);
+                    this.addExport(`\\draw[decorate, decoration={coil,`
+                        + `amplitude = ${amplitude}mm,`
+                        + `segment length = ${effectiveSegmentLength}mm,`
+                        + `aspect = ${aspect}`
+                        + `}]`
+                        + `(${from.x},${from.y}) -- (${to.x},${to.y});\n`);
+                }
+                return;
+            }
             if (linestyle == "dash") {
                 this.addExport(`\\draw [dashed](${this.coordinate.x},${-this.coordinate.y}) -- (${x},${y});\n`);
             }
@@ -203,6 +235,33 @@ class DrawContext {
             }
             if (loopStyle == "wave") {
                 option = `[decorate, decoration={snake, amplitude = 0.2mm, segment length = 1mm}]`;
+            }
+            if (loopStyle == "coil") {
+                // コイル線のパラメータ
+                const segmentLength = 1.0;
+                const aspect = 0.9;
+                const amplitude = 0.5;
+                let pathLength;
+                pathLength = radius * (endAngle - startAngle);
+                // 経路の長さが1波長(segmentLength)よりも短い場合、線の装飾をしない。
+                if (pathLength < segmentLength) {
+                    option = ``;
+                }
+                else {
+                    let n;
+                    let effectiveSegmentLength;
+                    let coilNTimesLength;
+                    n = Math.floor(pathLength / segmentLength);
+                    coilNTimesLength = 2 * aspect * amplitude +
+                        (n - 1 / 2) * segmentLength;
+                    effectiveSegmentLength = segmentLength +
+                        (pathLength - coilNTimesLength) / (n - 1 / 2);
+                    option = `[decorate, decoration={coil,`
+                        + `amplitude = ${amplitude}mm,`
+                        + `segment length = ${effectiveSegmentLength}mm,`
+                        + `aspect = ${aspect}`
+                        + `}]`;
+                }
             }
             let command = `\\draw`;
             if (fill) {
@@ -545,11 +604,106 @@ function drawWaveLine(line, exportType, color = "normal") {
     drawContext.closePath();
     // drawContext.setLineDash([])
 }
+function drawCoilLine(line, exportType, color = "normal") {
+    drawContext.setStrokeColor(color);
+    let lineStyle = "normal";
+    if (line.style == "dash") {
+        lineStyle = "dash";
+    }
+    let pathLength = line.length();
+    // 経路とその接線ベクトルの媒介変数表示
+    // 要素の種類によって決まる関数
+    let x;
+    let y;
+    let dx;
+    let dy;
+    {
+        x = (s) => {
+            return line.origin.x +
+                (line.to.x - line.origin.x) * s / pathLength;
+        };
+        y = (s) => {
+            return line.origin.y +
+                (line.to.y - line.origin.y) * s / pathLength;
+        };
+        dx = (s) => { return line.directionUnit().x; };
+        dy = (s) => { return line.directionUnit().y; };
+    }
+    // 線のスタイルとpathLengthによって決まる関数
+    let u;
+    let v;
+    {
+        // コイル線のパラメータ
+        const segmentLength = 1.0;
+        const aspect = 0.9;
+        const amplitude = 0.5;
+        // 経路の長さが1波長(segmentLength)よりも短い場合、線の装飾をしない。
+        if (pathLength < segmentLength) {
+            u = v = (s) => { return 0; };
+        }
+        else {
+            // コイルの巻き数
+            let n = Math.floor(pathLength / segmentLength);
+            // 弧長sから位相tへ
+            const t = (s) => {
+                return (s / pathLength) * (n - 1 / 2) * 2 * Math.PI;
+            };
+            u = (s) => {
+                // 第2項は両端を閉じるための補正。経路の中間点で0。
+                return aspect * amplitude * Math.cos(Math.PI - t(s)) -
+                    aspect * amplitude * (2 * s / pathLength - 1);
+            };
+            v = (s) => { return amplitude * Math.sin(Math.PI - t(s)); };
+        }
+    }
+    const resolution = 32; // 1巻きのコイルを32本の線分で描く程度
+    let ds, begin, end;
+    let f;
+    let g;
+    f = (s) => { return x(s) + (u(s) * dx(s) - v(s) * dy(s)); };
+    g = (s) => { return y(s) + (u(s) * dy(s) + v(s) * dx(s)); };
+    ds = 2 * Math.PI * 0.5 /*amplitude*/ / resolution;
+    begin = 0;
+    end = pathLength;
+    drawContext.beginPath();
+    {
+        let x, y, s;
+        x = f(begin), y = g(begin);
+        drawContext.moveTo(x, y);
+        for (s = begin; s < end; s += ds) {
+            x = f(s), y = g(s);
+            drawContext.lineTo(x, y, lineStyle);
+            drawContext.moveTo(x, y);
+        }
+        x = f(end), y = g(end);
+        drawContext.lineTo(x, y, lineStyle);
+    }
+    drawContext.stroke();
+    drawContext.closePath();
+    if (line.allow) {
+        drawAllow(line, exportType);
+    }
+    if (line.label) {
+        let diff = 1.0 + line.labelDiff;
+        let pos = line.center().add(line.directionUnit().rotation(Math.PI / 2).multi(diff));
+        let position = textPosition(line.label, pos, config);
+        drawContext.fillText(line.label, position.x, position.y);
+    }
+    drawContext.closePath();
+    // drawContext.setLineDash([])
+}
 function drawLine(line, exportType, color = "normal") {
     if (line.style == "wave") {
         ///MARK: not good
         if (exportType == "canvas") {
             drawWaveLine(line, exportType, color);
+            return;
+        }
+    }
+    if (line.style == "coil") {
+        ///MARK: not good
+        if (exportType == "canvas") {
+            drawCoilLine(line, exportType, color);
             return;
         }
     }
@@ -646,11 +800,131 @@ function drawWaveLoop(loop, exportType, color = "normal") {
     // drawContext.closePath()
     // drawContext.setLineDash([])
 }
+function drawCoilLoop(loop, exportType, color = "normal") {
+    let beginAngle = loop.loopBeginAngle;
+    let endAngle = loop.loopEndAngle;
+    if (beginAngle < 0) {
+        beginAngle += (Math.PI * 2);
+    }
+    if (beginAngle > (Math.PI * 2)) {
+        beginAngle -= Math.PI * 2;
+    }
+    if (endAngle < 0) {
+        endAngle += (Math.PI * 2);
+    }
+    if (endAngle > (Math.PI * 2)) {
+        endAngle -= Math.PI * 2;
+    }
+    if (beginAngle > endAngle) {
+        endAngle += Math.PI * 2;
+    }
+    drawContext.setStrokeColor(color);
+    let lineSyle = "normal";
+    if (loop.style == "dash") {
+        lineSyle = "dash";
+    }
+    let pathLength = loop.radius * (endAngle - beginAngle);
+    // 経路とその接線ベクトルの媒介変数表示
+    // 要素の種類によって決まる関数
+    let x;
+    let y;
+    let dx;
+    let dy;
+    {
+        // 弧長sから中心角angleへ
+        const angle = (s) => {
+            return s / loop.radius + beginAngle;
+        };
+        x = (s) => { return loop.radius * Math.cos(angle(s)) + loop.origin.x; };
+        y = (s) => { return loop.radius * Math.sin(angle(s)) + loop.origin.y; };
+        dx = (s) => { return Math.cos(angle(s) + Math.PI / 2); };
+        dy = (s) => { return Math.sin(angle(s) + Math.PI / 2); };
+    }
+    // 線のスタイルとpathLengthによって決まる関数
+    let u;
+    let v;
+    {
+        // コイル線のパラメータ
+        const segmentLength = 1.0;
+        const aspect = 0.9;
+        const amplitude = 0.5;
+        // 経路の長さが1波長(segmentLength)よりも短い場合、線の装飾をしない。
+        if (pathLength < segmentLength) {
+            u = v = (s) => { return 0; };
+        }
+        else {
+            // コイルの巻き数
+            let n = Math.floor(pathLength / segmentLength);
+            // 弧長sから位相tへ
+            const t = (s) => {
+                return (s / pathLength) * (n - 1 / 2) * 2 * Math.PI;
+            };
+            u = (s) => {
+                // 第2項は両端を閉じるための補正。経路の中間点で0。
+                return aspect * amplitude * Math.cos(Math.PI - t(s)) -
+                    aspect * amplitude * (2 * s / pathLength - 1);
+            };
+            v = (s) => { return amplitude * Math.sin(Math.PI - t(s)); };
+        }
+    }
+    const resolution = 32; // 1巻きのコイルを32本の線分で描く程度
+    let ds, begin, end;
+    let f;
+    let g;
+    f = (s) => { return x(s) + (u(s) * dx(s) - v(s) * dy(s)); };
+    g = (s) => { return y(s) + (u(s) * dy(s) + v(s) * dx(s)); };
+    ds = 2 * Math.PI * 0.5 /*amplitude*/ / resolution;
+    begin = 0;
+    end = pathLength;
+    drawContext.beginPath();
+    {
+        let x, y, s;
+        x = f(begin), y = g(begin);
+        drawContext.moveTo(x, y);
+        for (s = begin; s < end; s += ds) {
+            x = f(s), y = g(s);
+            drawContext.lineTo(x, y, lineSyle);
+            drawContext.moveTo(x, y);
+        }
+        x = f(end), y = g(end);
+        drawContext.lineTo(x, y, lineSyle);
+    }
+    drawContext.stroke();
+    drawContext.closePath();
+    /*
+        // 基準線
+        f = x
+        g = y
+        drawContext.beginPath()
+        {
+            let x: number, y: number, s: number
+    
+            x = f(begin), y = g(begin)
+            drawContext.moveTo(x, y)
+            for (s = begin; s < end; s += ds) {
+                x = f(s), y = g(s)
+                drawContext.lineTo(x, y, lineSyle)
+                drawContext.moveTo(x, y)
+            }
+            x = f(end), y = g(end)
+            drawContext.lineTo(x, y, lineSyle)
+        }
+        drawContext.stroke()
+        drawContext.closePath()
+    */
+}
 function drawLoop(loop, exportType, color = "normal") {
     if (loop.style == "wave") {
         ///MARK: not good
         if (exportType == "canvas") {
             drawWaveLoop(loop, exportType, color);
+            return;
+        }
+    }
+    if (loop.style == "coil") {
+        ///MARK: not good
+        if (exportType == "canvas") {
+            drawCoilLoop(loop, exportType, color);
             return;
         }
     }
@@ -663,6 +937,9 @@ function drawLoop(loop, exportType, color = "normal") {
     }
     if (loop.style == "wave") {
         lineStyle = "wave";
+    }
+    if (loop.style == "coil") {
+        lineStyle = "coil";
     }
     drawContext.arc(loop.origin.x, loop.origin.y, loop.radius, loop.loopBeginAngle, loop.loopEndAngle, lineStyle, loop.fill);
     drawContext.stroke();
@@ -1764,6 +2041,11 @@ class RDDraw {
                 return;
             }
             if (elem.style == "wave") {
+                elem.style = "coil";
+                this.drawAll();
+                return;
+            }
+            if (elem.style == "coil") {
                 elem.style = "normal";
                 this.drawAll();
                 return;
@@ -1783,6 +2065,11 @@ class RDDraw {
                 return;
             }
             if (elem.style == "wave") {
+                elem.style = "coil";
+                this.drawAll();
+                return;
+            }
+            if (elem.style == "coil") {
                 elem.style = "normal";
                 this.drawAll();
                 return;
