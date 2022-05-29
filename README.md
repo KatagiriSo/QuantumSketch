@@ -2,7 +2,7 @@
 
 This is a Feynman Diagram editor.
 Draw Feynman Diagram in the web browser,
-and export Tikz text.
+and export Tikz text and svg file.
 
 ![Demo mov](demo.gif)
 
