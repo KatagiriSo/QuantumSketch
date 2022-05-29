@@ -26,10 +26,13 @@ export class Line implements Elem {
     return line;
   }
 
-  constructor(label?: string) {
+  constructor(label?: string, style?: LineStyle) {
     this.id = getElemID();
     if (label) {
       this.label = label;
+    }
+      if (style) {
+        this.style = style
     }
   }
 

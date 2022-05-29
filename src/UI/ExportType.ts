@@ -1,1 +1,1 @@
-export type ExportType = "tikz"|"canvas"
+export type ExportType = "tikz"|"canvas"|"svg"

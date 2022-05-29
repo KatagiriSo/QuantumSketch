@@ -5,6 +5,7 @@
   "main": "rdfeynmann.js",
   "scripts": {
     "build": "webpack",
+    "watch": "webpack -w",
     "test": "node ./test.ts",
     "clean": "rm -f ./dist/*.js"
   },

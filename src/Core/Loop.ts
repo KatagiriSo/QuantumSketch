@@ -7,6 +7,7 @@ export class Loop implements Elem {
   id: string;
   shape: "Loop" = "Loop";
   style: LineStyle = "normal";
+  allow: Boolean = false;
   fill: boolean = false;
   origin: Vector = new Vector(0, 0);
   radius: number = 1;
@@ -28,10 +29,13 @@ export class Loop implements Elem {
     return loop;
   }
 
-  constructor(label?: string) {
+  constructor(label?: string, origin?: Vector) {
     this.id = getElemID();
     if (label) {
       this.label = label;
+    }
+    if (origin) {
+      this.origin = origin;
     }
   }
 

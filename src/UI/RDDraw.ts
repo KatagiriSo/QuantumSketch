@@ -194,11 +194,17 @@ export class RDDraw {
       this.setString(x, y);
       return;
     }
+      
+          if (ev.ctrlKey && ev.key == "e") {
+            this.drawAll("svg");
+            return;
+          }
 
     if (ev.key == "e") {
       this.drawAll("tikz");
       return;
     }
+
 
     if (ev.key == "f") {
       this.fill(x, y);
@@ -477,7 +483,11 @@ export class RDDraw {
     const current = this.repository.currentElement();
     if (current) {
       draw(this.drawContext, current, "canvas", "select");
-      this.drawContext.output("current:" + current.description(), "html", "current");
+      this.drawContext.output(
+        "current:" + current.description(),
+        "html",
+        "current"
+      );
     }
     this.drawContext.closePath();
   }
