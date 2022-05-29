@@ -222,7 +222,7 @@ export function drawLine(
 
   if (line.style == "coil") {
     ///MARK: not good
-    if (exportType == "canvas") {
+    if (exportType == "canvas" || exportType == "svg") {
       drawCoilLine(drawContext, line, exportType, color);
       return;
     }
@@ -533,7 +533,7 @@ export function drawLoop(
 
   if (loop.style == "coil") {
     ///MARK: not good
-    if (exportType == "canvas") {
+    if (exportType == "canvas" ||  exportType=="svg") {
       drawCoilLoop(drawContext, loop, exportType, color);
       return;
     }

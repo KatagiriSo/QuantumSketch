@@ -374,6 +374,19 @@ export class DrawContext {
       if (loopStyle == "dash") {
         dash = 'stroke-dasharray="4"';
       }
+
+      if (Math.abs(startAngle - endAngle) <= (Math.PI / 1) * 360) {
+        let fillStr = `fill="none"`;
+        if (fill) {
+          fillStr = `fill="black"`;
+        }
+        this.addExport(
+          `<circle cx="${x * this.scale}" cy="${y * this.scale}" r="${
+            radius * this.scale
+          }" stroke="black" ${dash} ${fillStr}/>`
+        );
+        return;
+      }
       // TODO cole, wave
       const sx = x + radius * Math.cos(startAngle);
       const sy = y + radius * Math.sin(startAngle);
@@ -404,7 +417,9 @@ export class DrawContext {
       return;
     }
     if (this.exportType == "svg") {
-      this.addExport(`<svg width="200px" height="200px">`);
+      this.addExport(
+        `<svg viewBox="0 0 ${50 * this.scale} ${50 * this.scale}">`
+      );
     }
     return;
   }
@@ -427,6 +442,7 @@ export class DrawContext {
 
       let selector = document.querySelector("div#output") as HTMLElement;
       selector.textContent = this.exportString;
+      this.fildDownload(this.exportString);
 
       const ret = this.exportString;
       loggerVer(this.exportString);
@@ -434,5 +450,21 @@ export class DrawContext {
       return ret;
     }
     return "";
+  }
+
+  fildDownload(content: string) {
+    const blob = new Blob([content], { type: "text/plain" });
+
+    let link = document.getElementById("download") as
+      | HTMLAnchorElement
+      | undefined;
+    if (link) {
+      link.href = window.URL.createObjectURL(blob);
+      const dateStr = new Date().toISOString();
+      const fileName = `${dateStr}.svg`;
+      link.download = fileName;
+      link.innerText = fileName;
+      link.hidden = false;
+    }
   }
 }
