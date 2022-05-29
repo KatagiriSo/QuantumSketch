@@ -1663,7 +1663,7 @@ class RDDraw {
     context: CanvasRenderingContext2D
     isClick: boolean = false
     isMouseDown:"Up"|"Down"|"Downning" = "Up"
-    clickIimeOutID?: number = undefined
+    clickIimeOutID?: NodeJS.Timeout = undefined
     prevX: number = 0
     prevY: number = 0
     stringMode?: string = undefined
@@ -2516,4 +2516,3 @@ class RDDraw {
 
 const h = new RDDraw(canvas)
 let drawContext = new DrawContext(context_)
-
