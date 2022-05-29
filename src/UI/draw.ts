@@ -214,7 +214,7 @@ export function drawLine(
 ) {
   if (line.style == "wave") {
     ///MARK: not good
-    if (exportType == "canvas") {
+    if (exportType == "canvas" || exportType == "svg") {
       drawWaveLine(drawContext, line, exportType, color);
       return;
     }
@@ -525,7 +525,7 @@ export function drawLoop(
 ) {
   if (loop.style == "wave") {
     ///MARK: not good
-    if (exportType == "canvas") {
+    if (exportType == "canvas" || exportType == "svg") {
       drawWaveLoop(drawContext, loop, exportType, color);
       return;
     }
