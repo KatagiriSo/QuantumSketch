@@ -7,6 +7,10 @@ module.exports = {
   // メインとなるJavaScriptファイル（エントリーポイント）
   entry: './src/rdfeynmann.ts',
 
+  output: {
+        filename: "main.js",
+        path: `${__dirname}/${"docs"}`,
+  },
   module: {
     rules: [
       {
