@@ -234,7 +234,12 @@ export class RDDraw {
     }
 
     if (ev.key == "p") {
-      this.putLine();
+      this.putLine(undefined);
+      return;
+    }
+
+    if (ev.key == "-") {
+      this.putLine(new Vector(x, y));
       return;
     }
 
@@ -491,9 +496,13 @@ export class RDDraw {
     this.drawContext.closePath();
   }
 
-  putLine() {
+  putLine(point: Vector|undefined) {
     let current = this.repository.currentElement();
     let sub = this.repository.currentSubElement();
+    if (point) {
+      sub = current
+      current = point
+    }
     if (!current) {
       return;
     }
@@ -539,6 +548,15 @@ export class RDDraw {
       let line = new Line();
       line.origin = sub;
       current.addLineTo(line);
+      this.repository.doCommand(new SetLine(line));
+      this.drawAll();
+      return;
+    }
+
+    if (isVector(current) && isLine(sub)) {
+      let line = new Line();
+      line.origin = sub.to
+      line.to = current
       this.repository.doCommand(new SetLine(line));
       this.drawAll();
       return;

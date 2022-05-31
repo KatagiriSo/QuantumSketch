@@ -110,9 +110,9 @@ export class RDRepository {
     this.vertex.set(`${vertex.x}_${vertex.y}`, vertex);
     this.vertexList.push(vertex);
     this.elements.push(vertex);
-    const currentIndex = this.currentIndex;
+    // const currentIndex = this.currentIndex;
     this.currentIndex = this.elements.length - 1;
-    this.currentSubIndex = currentIndex;
+    // this.currentSubIndex = currentIndex;
     loggerVer("currentIndex" + this.currentIndex);
   }
 
@@ -208,6 +208,7 @@ export class RDRepository {
     }
     let findIndex = 0;
     let current = this.currentElement();
+    let currentSubElement = this.currentSubElement();
     let currentDistance = Number.MAX_VALUE;
     for (let index = 0; index < this.elements.length; index++) {
       if (!current) {

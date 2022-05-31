@@ -95,9 +95,17 @@ export class Line implements Elem {
   }
 
   formalDistance(point: Vector): number {
+    const vec1 = point.minus(this.origin) 
+    const vec2 = point.minus(this.to)
+    // const cosTheta = vec1.prod(vec2)
+    if (Math.abs(vec1.length() + vec2.length() - this.length()) > 10 ) {
+      return Infinity
+    }
     let perp_unit = this.directionUnit().rotation(Math.PI / 2);
     let diff = point.minus(this.origin);
-    return Math.abs(diff.prod(perp_unit));
+    const perpLength = Math.abs(diff.prod(perp_unit));
+    
+    return perpLength
 
     // let toLength = this.to.minus(point).length()
     // let originLength = this.origin.minus(point).length()
