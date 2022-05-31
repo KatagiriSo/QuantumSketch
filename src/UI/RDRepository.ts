@@ -230,9 +230,9 @@ export class RDRepository {
       this.currentIndex = undefined;
       return;
     }
-    const currenIndex = this.currentIndex;
+    // const currenIndex = this.currentIndex;
     this.currentIndex = findIndex;
-    this.currentSubIndex = currenIndex;
+    // this.currentSubIndex = currenIndex;
   }
 
   subSelect(point: Vector) {

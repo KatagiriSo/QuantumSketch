@@ -194,17 +194,16 @@ export class RDDraw {
       this.setString(x, y);
       return;
     }
-      
-          if (ev.ctrlKey && ev.key == "e") {
-            this.drawAll("svg");
-            return;
-          }
+
+    if (ev.ctrlKey && ev.key == "e") {
+      this.drawAll("svg");
+      return;
+    }
 
     if (ev.key == "e") {
       this.drawAll("tikz");
       return;
     }
-
 
     if (ev.key == "f") {
       this.fill(x, y);
