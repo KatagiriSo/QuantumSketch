@@ -10,6 +10,9 @@ import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
 import { SetString, SetVertex, SetLoop, SetLine } from "./RepositoryCommand";
 
+
+
+
 export class RDDraw {
   repository: RDRepository = new RDRepository();
   canvas: HTMLCanvasElement;
@@ -18,8 +21,9 @@ export class RDDraw {
   isClick: boolean = false;
   isMouseDown: "Up" | "Down" | "Downning" = "Up";
   clickIimeOutID?: NodeJS.Timeout = undefined;
-  prevX: number = 0;
-  prevY: number = 0;
+  // private prevX: number = 0;
+  // private prevY: number = 0;
+  rawPointer: Vector = new Vector(0,0)
   stringMode?: string = undefined;
   isNoSelectMode: boolean = false;
   constructor(canvas: HTMLCanvasElement, drawContext: DrawContext) {
@@ -54,19 +58,30 @@ export class RDDraw {
     });
   }
 
+  setPrevXY(eventX: number, eventY: number) {
+    this.rawPointer = (new Vector(eventX, eventY))
+    // loggerVer(`rawPointer ${this.rawPointer.x}  ${this.rawPointer.y}`);
+  }
+  getPointer(): Vector {
+    const scale = config.scale;
+    const p = this.rawPointer.multi(1 / scale).floor()
+    // loggerVer(`p ${p.x}  ${p.y}`);
+    return p
+  }
+
   click(ev: MouseEvent) {
     this.isMouseDown = "Up";
-
-    const scale = config.scale;
-    const x = Math.floor(this.prevX / scale);
-    const y = Math.floor(this.prevY / scale);
+    const p = this.getPointer()
+    const x = p.x
+    const y = p.y
 
     if (this.isClick) {
+            if (this.clickIimeOutID) {
+              clearTimeout(this.clickIimeOutID);
+            }
       this.subSelect(new Vector(x, y));
       this.isClick = false;
-      if (this.clickIimeOutID) {
-        clearTimeout(this.clickIimeOutID);
-      }
+
       return;
     }
     this.isClick = true;
@@ -76,14 +91,6 @@ export class RDDraw {
       this.select(new Vector(x, y));
     }, 250);
   }
-
-  // dbclick(ev: MouseEvent) {
-
-  //     const scale = config.scale
-  //     const x = Math.floor(this.prevX / scale)
-  //     const y = Math.floor(this.prevY / scale)
-  //     this.subSelect(new Vector(x, y))
-  // }
 
   mouseDown(ev: MouseEvent) {
     this.isMouseDown = "Downning";
@@ -99,30 +106,9 @@ export class RDDraw {
   }
 
   move(ev: MouseEvent) {
-    const scale = config.scale;
-
-    // context.beginPath()
-    // context.fillStyle = 'rgb(255,255,255)'
-    // context.fillRect(this.prevX - 1, this.prevY - 1,
-    //     3, 3)
-    // // context.stroke()
-    // context.closePath()
-
-    // const x = Math.floor(ev.x / scale) * scale
-    // const y = Math.floor(ev.y / scale) * scale
-
-    // context.beginPath()
-    // context.fillStyle = 'rgb(255,0,0)'
-    // context.fillRect(x-1, y-1,
-    //     3, 3)
-    // // context.stroke()
-    // context.closePath()
-    // loggerVer(`move:${ev.x}_${ev.y}`)
-
-    this.prevX = ev.offsetX + config.scale / 2;
-    this.prevY = ev.offsetY + config.scale / 2;
-
-    // loggerVer("move")
+    // loggerVer(`offset ${ev.offsetX}  ${ev.offsetY}`);
+    // loggerVer(`screen ${ev.screenX}  ${ev.screenY}`);
+    this.setPrevXY(ev.offsetX, ev.offsetY);
     if (this.isMouseDown == "Down") {
       this.drag(ev);
     }
@@ -130,59 +116,9 @@ export class RDDraw {
 
   keyPress(ev: KeyboardEvent) {
     loggerVer("key:" + ev.key);
-    const scale = config.scale;
-    const x = Math.floor(this.prevX / scale);
-    const y = Math.floor(this.prevY / scale);
-
-    // if (this.stringMode != undefined) {
-
-    //     if (ev.key == "/" || ev.key == "Enter") {
-    //         // let current = this.repository.currentElement()
-    //         // if (current && isLine(current)) {
-    //         //     current.label = this.stringMode
-    //         //     this.stringMode = undefined
-    //         //     loggerVer("stringMode OUT")
-    //         //     this.drawAll()
-    //         //     return
-    //         // }
-    //         // if (current && isLoop(current)) {
-    //         //     current.label = this.stringMode
-    //         //     this.stringMode = undefined
-    //         //     loggerVer("stringMode OUT")
-    //         //     this.drawAll()
-    //         //     return
-    //         // }
-    //         // let str = new MyString(this.stringMode)
-    //         // str.origin = new Vector(x, y)
-    //         // this.repository.doCommand(new SetString(str))
-    //         this.stringMode = undefined
-    //         loggerVer("stringMode OUT")
-    //         this.drawAll()
-    //         return
-    //     }
-
-    //     let elem = this.repository.getElement(this.stringMode)
-    //     if (!elem) {
-    //         return
-    //     }
-    //     if (isString(elem)) {
-    //         elem.label = elem.label + ev.key
-    //         loggerVer("stringMode:" + elem.label)
-    //         this.drawAll()
-    //         return
-    //     }
-    //     return
-    // }
-
-    // if (ev.key == "/") {
-    //     loggerVer("stringMode In")
-    //     let str = new MyString("")
-    //     str.origin = new Vector(x, y)
-    //     let command = new SetString(str)
-    //     this.repository.doCommand(command)
-    //     this.stringMode = command.copyMyString.id
-    //     return
-    // }
+    const p = this.getPointer()
+    const x = p.x
+    const y = p.y
 
     if (ev.ctrlKey && ev.key == "c") {
       this.copy();
@@ -343,7 +279,7 @@ export class RDDraw {
     loggerVer("drag");
     let current = this.repository.currentElement();
     current?.moveAbsolute(
-      new Vector(this.prevX, this.prevY).multi(1 / config.scale)
+      this.getPointer().copy()
     );
     this.drawAll();
   }
@@ -464,7 +400,7 @@ export class RDDraw {
     const elms = this.repository.getAllElements();
     this.drawContext.beginPath();
     elms.forEach((elm, index) => {
-      loggerVer("draw..");
+      // loggerVer("draw..");
       draw(this.drawContext, elm, exportType);
     });
 
@@ -488,7 +424,9 @@ export class RDDraw {
     if (current) {
       draw(this.drawContext, current, "canvas", "select");
       this.drawContext.output(
-        "current:" + current.description(),
+        "current: " +
+          current.description() +
+          ` ${current.formalDistance(this.getPointer())}`,
         "html",
         "current"
       );
@@ -496,12 +434,12 @@ export class RDDraw {
     this.drawContext.closePath();
   }
 
-  putLine(point: Vector|undefined) {
+  putLine(point: Vector | undefined) {
     let current = this.repository.currentElement();
     let sub = this.repository.currentSubElement();
     if (point) {
-      sub = current
-      current = point
+      sub = current;
+      current = point;
     }
     if (!current) {
       return;
@@ -555,8 +493,8 @@ export class RDDraw {
 
     if (isVector(current) && isLine(sub)) {
       let line = new Line();
-      line.origin = sub.to
-      line.to = current
+      line.origin = sub.to;
+      line.to = current;
       this.repository.doCommand(new SetLine(line));
       this.drawAll();
       return;

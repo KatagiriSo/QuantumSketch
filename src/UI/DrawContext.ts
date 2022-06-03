@@ -199,7 +199,7 @@ export class DrawContext {
   fillRect(x: number, y_: number, w: number, h: number) {
     if (this.exportType == "canvas") {
       let y = y_;
-      loggerVer(`fillRect${x} ${y} ${w} ${h}`);
+      // loggerVer(`fillRect${x} ${y} ${w} ${h}`);
       this.canvasContext.fillRect(
         x * this.scale,
         y * this.scale,

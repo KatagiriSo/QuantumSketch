@@ -61,7 +61,7 @@ export function drawWaveLine(
   for (let l = 0; l < line.length(); l += 0.1) {
     let x = origin.x + unitVec.x * l + (perpVec.x * Math.sin(l * 5) * 3) / 15;
     let y = origin.y + unitVec.y * l + (perpVec.y * Math.sin(l * 5) * 3) / 15;
-    loggerVer(`draw ${l} ${x} ${y}`);
+    // loggerVer(`draw ${l} ${x} ${y}`);
     drawContext.lineTo(x, y, lineSyle);
     drawContext.moveTo(x, y);
     drawContext.stroke();
@@ -594,7 +594,7 @@ export function drawPoint(
   const y = point.y;
   drawContext.beginPath();
   drawContext.setFillColor(color);
-  loggerVer(`drawPoint ${x}_${y}, ${getColor(color)}`);
+  // loggerVer(`drawPoint ${x}_${y}, ${getColor(color)}`);
   drawContext.fillRect(x - 1 / 15, y - 1 / 15, 3 / 15, 3 / 15);
   drawContext.closePath();
 }
@@ -611,7 +611,7 @@ function drawText(
 
   drawContext.setFillColor(color);
   drawContext.fillText(str.label, x, y);
-  loggerVer(`drawText ${x}_${y}, ${getColor(color)}`);
+  // loggerVer(`drawText ${x}_${y}, ${getColor(color)}`);
   drawContext.closePath();
 }
 

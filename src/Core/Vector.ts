@@ -24,6 +24,10 @@ export class Vector implements Elem {
     return new Vector(this.x * num, this.y * num);
   }
 
+  floor(): Vector {
+    return new Vector(Math.floor(this.x), Math.floor(this.y));
+  }
+
   prod(vec: Vector): number {
     return this.x * vec.x + this.y * vec.y;
   }
@@ -46,11 +50,11 @@ export class Vector implements Elem {
   }
 
   formalDistance(point: Vector): number {
-    let length = this.minus(point).length();
-    if (length > 0.3) {
-      return Number.MAX_VALUE;
-    }
-    return 0;
+    return (length = this.minus(point).length());
+    // if (length > 0.3) {
+    //   return Number.MAX_VALUE;
+    // }
+    // return 0;
   }
 
   move(delta: Vector): void {

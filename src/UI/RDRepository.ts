@@ -15,7 +15,6 @@ export class RDRepository {
   currentIndex: number | undefined = undefined;
   currentSubIndex: number | undefined = undefined;
   elements: Elem[] = [];
-  selectCount: number = 0;
   idCount = 0;
   history: RepositoryCommand[] = [];
 
@@ -23,6 +22,14 @@ export class RDRepository {
     return this.elements.find((elem) => {
       return elem.id == id;
     });
+  }
+
+  setCurrentElement(elem: Elem) {
+    this.currentIndex = this.elements.findIndex((e) => e.id === elem.id);
+  }
+
+  setSubCurrentElement(elem: Elem) {
+    this.currentSubIndex = this.elements.findIndex((e) => e.id === elem.id);
   }
 
   currentElement(): Elem | undefined {
@@ -35,7 +42,6 @@ export class RDRepository {
     ) {
       return this.elements[this.currentIndex];
     }
-    // loggerVer("no currentElement")
     return undefined;
   }
 
@@ -199,68 +205,54 @@ export class RDRepository {
     }
   }
 
-  select(point: Vector) {
-    loggerVer("select");
-    this.selectCount++;
+  findMostNearElements(point: Vector, elements: Elem[]): Elem[] {
+    const sorted = [...elements].sort((e1, e2) => {
+      return e1.formalDistance(point) - e2.formalDistance(point);
+    });
+    if (sorted.length < 2) {
+      return sorted;
+    }
+    const elem = sorted[0];
+    return sorted.filter(
+      (e) => e.formalDistance(point) === elem.formalDistance(point)
+    );
+  }
 
-    if (this.elements.length == 0) {
-      return;
+  select(point: Vector) {
+    const elem = this.findElement(point, this.currentElement()?.id);
+    if (elem) {
+      this.setCurrentElement(elem);
     }
-    let findIndex = 0;
-    let current = this.currentElement();
-    let currentSubElement = this.currentSubElement();
-    let currentDistance = Number.MAX_VALUE;
-    for (let index = 0; index < this.elements.length; index++) {
-      if (!current) {
-        findIndex = index;
-        current = this.elements[index];
-        continue;
-      }
-      let indexElement = this.elements[index];
-      let indexDistance = indexElement.formalDistance(point);
-      if (indexDistance <= currentDistance && this.currentIndex != index) {
-        if (/*this.selectCount <= 1 || this.currentSubIndex != index*/ true) {
-          loggerVer(`near:${findIndex}`);
-          findIndex = index;
-          current = indexElement;
-          currentDistance = indexDistance;
-        }
-      }
-    }
-    if (currentDistance == Number.MAX_VALUE) {
-      this.currentIndex = undefined;
-      return;
-    }
-    // const currenIndex = this.currentIndex;
-    this.currentIndex = findIndex;
-    // this.currentSubIndex = currenIndex;
   }
 
   subSelect(point: Vector) {
-    loggerVer("subSelect");
-    this.selectCount = 0;
-    if (this.elements.length == 0) {
+    const elem = this.findElement(point, this.currentSubElement()?.id);
+    if (elem) {
+      this.setSubCurrentElement(elem);
+    }
+  }
+
+  findElement(point: Vector, current_id: string | undefined) {
+    const nearElements = this.findMostNearElements(point, this.elements);
+
+    if (nearElements.length === 0) {
       return;
     }
-    let findIndex = 0;
-    let current = this.currentSubElement();
-    for (let index = 0; index < this.elements.length; index++) {
-      if (!current) {
-        findIndex = index;
-        current = this.elements[index];
-        continue;
-      }
-      let indexElement = this.elements[index];
-      let indexDistance = indexElement.formalDistance(point);
-      let currentDistance = current.formalDistance(point);
-      if (indexDistance <= currentDistance && this.currentSubIndex != index) {
-        loggerVer(`near:${findIndex}`);
-        findIndex = index;
-        current = indexElement;
-      }
-    }
 
-    this.currentSubIndex = findIndex;
+    function next(elems: Elem[], index?: number): Elem {
+      if (index === undefined || index < 0) {
+        return elems[0];
+      }
+      if (index >= elems.length) {
+        return elems[0];
+      }
+      return elems[index];
+    }
+    const indexOfCurrent = nearElements.findIndex((e) => e.id === current_id);
+
+    let nearElement = next(nearElements, indexOfCurrent);
+
+    return nearElement;
   }
 
   clearSelectMode() {
