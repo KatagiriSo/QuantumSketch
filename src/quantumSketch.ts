@@ -1,4 +1,4 @@
-// "RDFeynmann  So Katagiri"
+// "QuantumSketch  So Katagiri"
 
 import { clossLoop, draw2loop } from "./sample/sample";
 import { DrawContext } from "./UI/DrawContext"

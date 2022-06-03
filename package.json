@@ -2,7 +2,7 @@
   "name": "rdfeyn",
   "version": "1.0.1",
   "description": "feynmann diagram",
-  "main": "rdfeynmann.js",
+  "main": "main.js",
   "scripts": {
     "build": "webpack",
     "watch": "webpack -w",

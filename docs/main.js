@@ -150,13 +150,13 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpac
 
 /***/ }),
 
-/***/ "./src/rdfeynmann.ts":
-/*!***************************!*\
-  !*** ./src/rdfeynmann.ts ***!
-  \***************************/
+/***/ "./src/quantumSketch.ts":
+/*!******************************!*\
+  !*** ./src/quantumSketch.ts ***!
+  \******************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./UI/DrawContext */ \"./src/UI/DrawContext.ts\");\n/* harmony import */ var _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./UI/RDDraw */ \"./src/UI/RDDraw.ts\");\n// \"RDFeynmann  So Katagiri\"\n\n\nvar canvas = document.getElementById(\"canvas\");\nvar context_ = canvas.getContext(\"2d\");\nvar drawContext = new _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__.DrawContext(context_);\nvar h = new _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__.RDDraw(canvas, drawContext);\n// console.log(clossLoop(drawContext));\n\n\n//# sourceURL=webpack://rdfeyn/./src/rdfeynmann.ts?");
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./UI/DrawContext */ \"./src/UI/DrawContext.ts\");\n/* harmony import */ var _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./UI/RDDraw */ \"./src/UI/RDDraw.ts\");\n// \"QuantumSketch  So Katagiri\"\n\n\nvar canvas = document.getElementById(\"canvas\");\nvar context_ = canvas.getContext(\"2d\");\nvar drawContext = new _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__.DrawContext(context_);\nvar h = new _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__.RDDraw(canvas, drawContext);\n// console.log(clossLoop(drawContext));\n\n\n//# sourceURL=webpack://rdfeyn/./src/quantumSketch.ts?");
 
 /***/ })
 
@@ -220,7 +220,7 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _UI_
 /******/ 	// startup
 /******/ 	// Load entry module and return exports
 /******/ 	// This entry module can't be inlined because the eval devtool is used.
-/******/ 	var __webpack_exports__ = __webpack_require__("./src/rdfeynmann.ts");
+/******/ 	var __webpack_exports__ = __webpack_require__("./src/quantumSketch.ts");
 /******/ 	
 /******/ })()
 ;
