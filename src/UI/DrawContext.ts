@@ -14,6 +14,7 @@ export class DrawContext {
   private scale: number = config.scale;
   constructor(context: CanvasRenderingContext2D) {
     this.canvasContext = context;
+    this.canvasContext.font = "25px Arial";
   }
 
   output(desc: string, exportType: "html", id: "sub" | "current") {
@@ -251,7 +252,8 @@ export class DrawContext {
       this.addExport(
         `<text x="${x * this.scale}" y="${
           y * this.scale
-        }" font-family="Verdana" font-size="35">`
+        }" font-family="Verdana" font-size="35">
+        ${txt}</text>`
       );
       return;
     }
@@ -450,6 +452,12 @@ export class DrawContext {
       return ret;
     }
     return "";
+  }
+
+  insertsavedata(saveData: string) {
+    if (this.exportType == "svg") {
+      this.addExport(`<!-- QuantumSketchSaveDataStart@${saveData}@ -->`)
+    }
   }
 
   fildDownload(content: string) {

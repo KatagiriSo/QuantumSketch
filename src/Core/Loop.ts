@@ -1,7 +1,8 @@
 import { Elem, getElemID } from "./Elem";
 import { LabelInfo } from "./LabelInfo";
 import { LineStyle, Line } from "./Line";
-import { Vector, direction } from "./Vector";
+import { Shape } from "./Shape";
+import { Vector, direction, makeVector } from "./Vector";
 
 export class Loop implements Elem {
   id: string;
@@ -15,6 +16,25 @@ export class Loop implements Elem {
   labels: LabelInfo[] = [];
   loopBeginAngle: number = 0;
   loopEndAngle: number = Math.PI * 2;
+
+  save(): any {
+    let saveData = {} as any;
+    saveData["id"] = this.id;
+    saveData["label"] = this.label;
+    saveData["labels"] = this.labels;
+
+    saveData["shape"] = this.shape;
+    saveData["style"] = this.style;
+    saveData["allow"] = this.allow;
+    saveData["fill"] = this.fill;
+
+    saveData["origin"] = this.origin.save();
+    saveData["radius"] = this.radius;
+    saveData["loopBeginAngle"] = this.loopBeginAngle;
+    saveData["loopEndAngle"] = this.loopEndAngle;
+
+    return saveData;
+  }
 
   copy(): Loop {
     let loop = new Loop();
@@ -77,4 +97,21 @@ export class Loop implements Elem {
 
 export function isLoop(elem: Elem): elem is Loop {
   return elem.shape == "Loop";
+}
+
+export function makeLoop(data: any): Loop | undefined {
+  const shape = data["shape"] as Shape | undefined;
+  if (shape) {
+    return undefined;
+  }
+  const elm = new Loop(undefined, undefined);
+  elm.id = data["id"];
+  elm.label = data["label"];
+  elm.style = data["style"];
+  elm.allow = data["allow"];
+  elm.fill = data["fill"];
+  elm.origin = makeVector(data["origin"]) ?? new Vector(0, 0);
+  elm.loopBeginAngle = data["loopBeginAngle"];
+  elm.loopEndAngle = data["loopEndAngle"];
+  return elm;
 }

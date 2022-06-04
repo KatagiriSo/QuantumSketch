@@ -1,8 +1,9 @@
 import { Elem } from "../Core/Elem";
-import { Line } from "../Core/Line";
-import { Loop } from "../Core/Loop";
-import { MyString } from "../Core/MyString";
-import { Vector } from "../Core/Vector";
+import { Line, makeLine } from "../Core/Line";
+import { Loop, makeLoop } from "../Core/Loop";
+import { makeMyString, MyString } from "../Core/MyString";
+import { Shape } from "../Core/Shape";
+import { makeVector, Vector } from "../Core/Vector";
 import { loggerVer } from "../looger";
 import { RepositoryCommand } from "./RepositoryCommand";
 
@@ -17,6 +18,41 @@ export class RDRepository {
   elements: Elem[] = [];
   idCount = 0;
   history: RepositoryCommand[] = [];
+
+  save(): string {
+    const saveData = {} as any;
+    saveData["elements"] = this.elements.map((e) => e.save());
+    return JSON.stringify(saveData);
+  }
+
+  load(saveData: string) {
+    const saveJson = JSON.parse(saveData);
+    this.idCount = 0;
+    this.currentIndex = 0
+    this.currentSubIndex = 0
+    this.elements = this.loadElements(saveJson["elements"]);
+    this.idCount = Math.max(...this.elements.map(e => Math.floor(Number.parseFloat(e .id))))
+  }
+
+  loadElements(saveJsonElements: any[]): Elem[] {
+    return saveJsonElements.flatMap(e => {
+      const json = JSON.parse(e)
+      const shape = json["shape"];
+      if (!shape) {
+        return undefined
+      }
+      switch (shape as Shape) {
+        case "Line":
+          return makeLine(json);
+        case "Loop":
+          return makeLoop(json)
+        case "Point":
+          return makeVector(json)
+        case "String":
+          return makeMyString(json)
+      }
+    }).flatMap(e => e !== undefined ? [e] : []).flat()
+  }
 
   getElement(id: string): Elem | undefined {
     return this.elements.find((elem) => {

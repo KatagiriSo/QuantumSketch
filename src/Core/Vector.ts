@@ -11,6 +11,16 @@ export class Vector implements Elem {
     this.x = x;
     this.y = y;
   }
+
+  save(): any {
+    const saveData = {} as any
+    saveData["id"] = this.id
+    saveData["shape"] = this.shape
+    saveData["x"] = this.x
+    saveData["y"] = this.x;
+    return saveData
+  }
+
   add(vec: Vector): Vector {
     return new Vector(this.x + vec.x, this.y + vec.y);
   }
@@ -79,4 +89,17 @@ export function isVector(elem: Elem): elem is Vector {
 
 export function direction(v1: Vector, v2: Vector): Vector {
   return v1.minus(v2);
+}
+
+
+export function makeVector(data: any): Vector|undefined {
+  const shape = data["shape"] as Shape | undefined
+  if (shape) {
+    return undefined
+  }
+  const elm = new Vector(0,0)
+  elm.id = data["id"];
+  elm.x = data["x"];
+  elm.y = data["y"];
+  return elm
 }

@@ -1,6 +1,7 @@
 import { Elem, getElemID } from "./Elem";
 import { Loop } from "./Loop";
-import { Vector } from "./Vector";
+import { Shape } from "./Shape";
+import { makeVector, Vector } from "./Vector";
 
 export type LineStyle = "normal" | "dash" | "wave" | "coil" | "double"; //
 // wave https://stackoverflow.com/questions/29917446/drawing-sine-wave-in-canvas
@@ -14,6 +15,17 @@ export class Line implements Elem {
   allow: Boolean = true;
   origin: Vector = new Vector(0, 0);
   to: Vector = new Vector(0, 0);
+
+  save(): any {
+    let saveData = {} as any
+    saveData["id"] = this.id
+    saveData["label"] = this.label
+    saveData["style"] = this.style;
+    saveData["allow"] = this.allow;
+    saveData["origin"] = this.origin.save();
+    saveData["to"] = this.to.save();
+    return saveData
+  }
 
   copy(): Line {
     let line = new Line();
@@ -31,8 +43,8 @@ export class Line implements Elem {
     if (label) {
       this.label = label;
     }
-      if (style) {
-        this.style = style
+    if (style) {
+      this.style = style;
     }
   }
 
@@ -95,17 +107,17 @@ export class Line implements Elem {
   }
 
   formalDistance(point: Vector): number {
-    const vec1 = point.minus(this.origin) 
-    const vec2 = point.minus(this.to)
+    const vec1 = point.minus(this.origin);
+    const vec2 = point.minus(this.to);
     // const cosTheta = vec1.prod(vec2)
-    if (Math.abs(vec1.length() + vec2.length() - this.length()) > 10 ) {
-      return Infinity
+    if (Math.abs(vec1.length() + vec2.length() - this.length()) > 10) {
+      return Infinity;
     }
     let perp_unit = this.directionUnit().rotation(Math.PI / 2);
     let diff = point.minus(this.origin);
     const perpLength = Math.abs(diff.prod(perp_unit));
-    
-    return perpLength
+
+    return perpLength;
 
     // let toLength = this.to.minus(point).length()
     // let originLength = this.origin.minus(point).length()
@@ -122,7 +134,7 @@ export class Line implements Elem {
   }
 
   vector(): Vector {
-    return this.to.minus(this.origin)
+    return this.to.minus(this.origin);
   }
 
   description(): string {
@@ -132,4 +144,21 @@ export class Line implements Elem {
 
 export function isLine(elem: Elem): elem is Line {
   return elem.shape == "Line";
+}
+
+export function makeLine(data: any): Line | undefined {
+  const shape = data["shape"] as Shape | undefined;
+  if (shape) {
+    return undefined;
+  }
+  const elm = new Line(undefined, undefined);
+  elm.id = data["id"];
+  elm.label = data["label"];
+  elm.style = data["style"];
+  elm.allow = data["allow"];
+  elm.labelDiff = data["labelDiff"];
+  elm.origin = makeVector(data["origin"]) ?? new Vector(0, 0)
+  elm.to = makeVector(data["to"]) ?? new Vector(0, 0);
+
+  return elm;
 }

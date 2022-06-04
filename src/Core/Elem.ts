@@ -9,6 +9,7 @@ export interface Elem {
   copy(): Elem;
   moveAbsolute(location: Vector): void;
   description(): string;
+  save() : any
 }
 
 let elemIDCounter = 0;

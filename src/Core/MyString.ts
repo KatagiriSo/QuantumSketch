@@ -1,4 +1,5 @@
 import { Elem, getElemID } from "./Elem";
+import { Shape } from "./Shape";
 import { Vector } from "./Vector";
 
 export class MyString implements Elem {
@@ -6,6 +7,16 @@ export class MyString implements Elem {
   shape: "String" = "String";
   label: string;
   origin: Vector = new Vector(0, 0);
+
+  save(): any {
+    let saveData = {} as any;
+    saveData["id"] = this.id;
+    saveData["label"] = this.label;
+    saveData["shape"] = this.shape;
+    saveData["origin"] = this.origin.save();
+    return saveData;
+  }
+
   copy(): MyString {
     let str = new MyString(this.label);
     str.origin = this.origin;
@@ -35,4 +46,15 @@ export class MyString implements Elem {
 
 export function isString(elem: Elem): elem is MyString {
   return elem.shape == "String";
+}
+
+export function makeMyString(data: any): MyString | undefined {
+  const shape = data["shape"] as Shape | undefined;
+  if (shape) {
+    return undefined;
+  }
+  const elm = new MyString("");
+  elm.id = data["id"];
+  elm.label = data["label"];
+  return elm;
 }

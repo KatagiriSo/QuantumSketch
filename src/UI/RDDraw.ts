@@ -404,6 +404,10 @@ export class RDDraw {
       draw(this.drawContext, elm, exportType);
     });
 
+    if (exportType === "svg") {
+      this.drawContext.insertsavedata(this.repository.save())
+    }
+
     this.drawContext.endExport();
 
     if (this.isNoSelectMode) {
