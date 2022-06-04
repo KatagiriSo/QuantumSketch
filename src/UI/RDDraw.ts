@@ -10,9 +10,6 @@ import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
 import { SetString, SetVertex, SetLoop, SetLine } from "./RepositoryCommand";
 
-
-
-
 export class RDDraw {
   repository: RDRepository = new RDRepository();
   canvas: HTMLCanvasElement;
@@ -23,7 +20,7 @@ export class RDDraw {
   clickIimeOutID?: NodeJS.Timeout = undefined;
   // private prevX: number = 0;
   // private prevY: number = 0;
-  rawPointer: Vector = new Vector(0,0)
+  rawPointer: Vector = new Vector(0, 0);
   stringMode?: string = undefined;
   isNoSelectMode: boolean = false;
   constructor(canvas: HTMLCanvasElement, drawContext: DrawContext) {
@@ -59,26 +56,26 @@ export class RDDraw {
   }
 
   setPrevXY(eventX: number, eventY: number) {
-    this.rawPointer = (new Vector(eventX, eventY))
+    this.rawPointer = new Vector(eventX, eventY);
     // loggerVer(`rawPointer ${this.rawPointer.x}  ${this.rawPointer.y}`);
   }
   getPointer(): Vector {
     const scale = config.scale;
-    const p = this.rawPointer.multi(1 / scale).floor()
+    const p = this.rawPointer.multi(1 / scale).floor();
     // loggerVer(`p ${p.x}  ${p.y}`);
-    return p
+    return p;
   }
 
   click(ev: MouseEvent) {
     this.isMouseDown = "Up";
-    const p = this.getPointer()
-    const x = p.x
-    const y = p.y
+    const p = this.getPointer();
+    const x = p.x;
+    const y = p.y;
 
     if (this.isClick) {
-            if (this.clickIimeOutID) {
-              clearTimeout(this.clickIimeOutID);
-            }
+      if (this.clickIimeOutID) {
+        clearTimeout(this.clickIimeOutID);
+      }
       this.subSelect(new Vector(x, y));
       this.isClick = false;
 
@@ -116,9 +113,9 @@ export class RDDraw {
 
   keyPress(ev: KeyboardEvent) {
     loggerVer("key:" + ev.key);
-    const p = this.getPointer()
-    const x = p.x
-    const y = p.y
+    const p = this.getPointer();
+    const x = p.x;
+    const y = p.y;
 
     if (ev.ctrlKey && ev.key == "c") {
       this.copy();
@@ -170,12 +167,17 @@ export class RDDraw {
     }
 
     if (ev.key == "p") {
-      this.putLine(undefined);
+      this.putLine(undefined, true);
+      return;
+    }
+
+    if (ev.key == "P") {
+      this.putLine(undefined, false);
       return;
     }
 
     if (ev.key == "-") {
-      this.putLine(new Vector(x, y));
+      this.putLine(new Vector(x, y), true);
       return;
     }
 
@@ -278,9 +280,7 @@ export class RDDraw {
   drag(ev: MouseEvent) {
     loggerVer("drag");
     let current = this.repository.currentElement();
-    current?.moveAbsolute(
-      this.getPointer().copy()
-    );
+    current?.moveAbsolute(this.getPointer().copy());
     this.drawAll();
   }
 
@@ -434,7 +434,7 @@ export class RDDraw {
     this.drawContext.closePath();
   }
 
-  putLine(point: Vector | undefined) {
+  putLine(point: Vector | undefined, isReverse: boolean) {
     let current = this.repository.currentElement();
     let sub = this.repository.currentSubElement();
     if (point) {
@@ -476,7 +476,11 @@ export class RDDraw {
     if (isVector(current) && isLoop(sub)) {
       let line = new Line();
       line.origin = current;
-      sub.addLineTo(line);
+      if (isReverse) {
+        sub.addLineTo(line);
+      } else {
+        sub.addLineOrigin(line);
+      }
       this.repository.doCommand(new SetLine(line));
       this.drawAll();
       return;
@@ -493,8 +497,38 @@ export class RDDraw {
 
     if (isVector(current) && isLine(sub)) {
       let line = new Line();
-      line.origin = sub.to;
+      if (isReverse) {
+        line.origin = sub.to;
+      } else {
+        line.origin = sub.origin;
+      }
       line.to = current;
+      this.repository.doCommand(new SetLine(line));
+      this.drawAll();
+      return;
+    }
+
+    if (isLine(current) && isVector(sub)) {
+      let line = new Line();
+      if (isReverse) {
+        line.to = current.to;
+      } else {
+        line.to = current.origin;
+      }
+      line.origin = sub;
+      this.repository.doCommand(new SetLine(line));
+      this.drawAll();
+      return;
+    }
+
+    if (isLine(current) && isLine(sub)) {
+      let line = new Line();
+      if (isReverse) {
+        line.to = current.to;
+      } else {
+        line.to = current.origin;
+      }
+      line.origin = sub.to;
       this.repository.doCommand(new SetLine(line));
       this.drawAll();
       return;
@@ -773,6 +807,11 @@ export class RDDraw {
         return;
       }
       if (elem.style == "coil") {
+        elem.style = "double";
+        this.drawAll();
+        return;
+      }
+      if (elem.style == "double") {
         elem.style = "normal";
         this.drawAll();
         return;

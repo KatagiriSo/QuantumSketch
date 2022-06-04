@@ -2,7 +2,7 @@ import { Elem, getElemID } from "./Elem";
 import { Loop } from "./Loop";
 import { Vector } from "./Vector";
 
-export type LineStyle = "normal" | "dash" | "wave" | "coil"; //
+export type LineStyle = "normal" | "dash" | "wave" | "coil" | "double"; //
 // wave https://stackoverflow.com/questions/29917446/drawing-sine-wave-in-canvas
 
 export class Line implements Elem {
@@ -119,6 +119,10 @@ export class Line implements Elem {
     //     return originLength
     // }
     // return originLength + 1
+  }
+
+  vector(): Vector {
+    return this.to.minus(this.origin)
   }
 
   description(): string {

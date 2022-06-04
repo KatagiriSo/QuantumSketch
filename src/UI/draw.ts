@@ -37,6 +37,84 @@ export function draw(
   }
 }
 
+export function drawDoubleLine(
+  drawContext: DrawContext,
+  line: Line,
+  exportType: ExportType,
+  color: Color = "normal"
+) {
+  drawContext.beginPath();
+
+  drawContext.setStrokeColor(color);
+  let linestyle: LineStyle = line.style;
+
+  const deltaVec = line.vector().rotation(Math.PI / 2).unit().multi(1/10);
+  drawContext.moveTo(line.origin.x + deltaVec.x, line.origin.y + deltaVec.y);
+  drawContext.lineTo(line.to.x + deltaVec.x, line.to.y+ deltaVec.y, linestyle);
+
+  drawContext.stroke();
+  drawContext.closePath();
+  // drawContext.setLineDash([])
+
+  drawContext.moveTo(line.origin.x - deltaVec.x, line.origin.y- deltaVec.y);
+  drawContext.lineTo(line.to.x- deltaVec.x, line.to.y- deltaVec.y, linestyle);
+  // context.arc(100, 10, 50, 0, Math.PI * 2)
+
+  drawContext.stroke();
+  if (line.allow) {
+    drawAllow(drawContext, line, exportType);
+  }
+  if (line.label) {
+    let diff = 1.0 + line.labelDiff;
+    let pos = line.center().add(
+      line
+        .directionUnit()
+        .rotation(Math.PI / 2)
+        .multi(diff)
+    );
+    let position = textPosition(line.label, pos, config);
+    drawContext.fillText(line.label, position.x, position.y);
+  }
+
+  drawContext.closePath();
+  // drawContext.setLineDash([])
+}
+
+export function drawNormalLine(
+  drawContext: DrawContext,
+  line: Line,
+  exportType: ExportType,
+  color: Color = "normal"
+) {
+  drawContext.beginPath();
+
+  drawContext.setStrokeColor(color);
+  let linestyle: LineStyle = line.style;
+
+  drawContext.moveTo(line.origin.x, line.origin.y);
+  drawContext.lineTo(line.to.x, line.to.y, linestyle);
+  // context.arc(100, 10, 50, 0, Math.PI * 2)
+
+  drawContext.stroke();
+  if (line.allow) {
+    drawAllow(drawContext, line, exportType);
+  }
+  if (line.label) {
+    let diff = 1.0 + line.labelDiff;
+    let pos = line.center().add(
+      line
+        .directionUnit()
+        .rotation(Math.PI / 2)
+        .multi(diff)
+    );
+    let position = textPosition(line.label, pos, config);
+    drawContext.fillText(line.label, position.x, position.y);
+  }
+
+  drawContext.closePath();
+  // drawContext.setLineDash([])
+}
+
 export function drawWaveLine(
   drawContext: DrawContext,
   line: Line,
@@ -228,33 +306,13 @@ export function drawLine(
     }
   }
 
-  drawContext.beginPath();
-
-  drawContext.setStrokeColor(color);
-  let linestyle: LineStyle = line.style;
-
-  drawContext.moveTo(line.origin.x, line.origin.y);
-  drawContext.lineTo(line.to.x, line.to.y, linestyle);
-  // context.arc(100, 10, 50, 0, Math.PI * 2)
-
-  drawContext.stroke();
-  if (line.allow) {
-    drawAllow(drawContext, line, exportType);
-  }
-  if (line.label) {
-    let diff = 1.0 + line.labelDiff;
-    let pos = line.center().add(
-      line
-        .directionUnit()
-        .rotation(Math.PI / 2)
-        .multi(diff)
-    );
-    let position = textPosition(line.label, pos, config);
-    drawContext.fillText(line.label, position.x, position.y);
+  if (line.style == "double") {
+    drawDoubleLine(drawContext, line, exportType, color);
+    return
   }
 
-  drawContext.closePath();
-  // drawContext.setLineDash([])
+  drawNormalLine(drawContext, line, exportType, color)
+
 }
 
 export function drawAllow(
