@@ -8,8 +8,6 @@ import { loggerVer } from "../looger";
 import { RepositoryCommand } from "./RepositoryCommand";
 
 export class RDRepository {
-  vertex = new Map<string, Vector>();
-  loop = new Map<string, Loop>();
   vertexList: Vector[] = [];
   loopList: Loop[] = [];
   lineList: Line[] = [];
@@ -91,16 +89,6 @@ export class RDRepository {
     return undefined;
   }
 
-  getVertex(x: number, y: number): Vector | undefined {
-    const vec = this.vertex.get(`${x}_${y}`);
-    return vec;
-  }
-
-  getLoop(x: number, y: number): Loop | undefined {
-    const loop = this.loop.get(`${x}_${y}`);
-    return loop;
-  }
-
   getAllVertex(): Vector[] {
     return this.vertexList;
   }
@@ -143,13 +131,6 @@ export class RDRepository {
   setVertex(vertex: Vector) {
     const x = vertex.x;
     const y = vertex.y;
-    if (this.vertex.get(`${x}_${y}`)) {
-      this.vertex.delete(`${x}_${y}`);
-      this.vertexList = this.vertexList.filter((vec) => {
-        return vec.x != vertex.x && vec.y == vertex.y;
-      });
-    }
-    this.vertex.set(`${vertex.x}_${vertex.y}`, vertex);
     this.vertexList.push(vertex);
     this.elements.push(vertex);
     // const currentIndex = this.currentIndex;
@@ -161,13 +142,6 @@ export class RDRepository {
   setLoop(loop: Loop) {
     const x = loop.origin.x;
     const y = loop.origin.y;
-    if (this.loop.get(`${x}_${y}`)) {
-      this.loop.delete(`${x}_${y}`);
-      this.loopList = this.loopList.filter((l) => {
-        return l.origin.x != loop.origin.x && l.origin.y == loop.origin.y;
-      });
-    }
-    this.loop.set(`${x}_${y}`, loop);
     this.loopList.push(loop);
     this.elements.push(loop);
     this.currentIndex = this.elements.length - 1;
