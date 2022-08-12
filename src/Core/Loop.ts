@@ -59,12 +59,34 @@ export class Loop implements Elem {
     }
   }
 
+  setLoopBeginAngle(angle: number): void {
+    if (angle >= 2 * Math.PI) angle -= 2 * Math.PI;
+    if (angle < 0.0         ) angle += 2 * Math.PI;
+    this.loopBeginAngle = angle;
+  }
+
+  setLoopEndAngle(angle: number): void {
+    if (angle >= 2 * Math.PI) angle -= 2 * Math.PI;
+    if (angle < 0           ) angle += 2 * Math.PI;
+    this.loopEndAngle = angle;
+  }
+
+  setRadius(radius: number): void {
+    if (radius < 1) radius = 1;
+    this.radius = radius;
+  }
+
   move(delta: Vector): void {
     this.origin = this.origin.add(delta);
   }
 
   moveAbsolute(location: Vector): void {
     this.origin = location;
+  }
+
+  rotation(delta: number): void {
+    this.setLoopBeginAngle(this.loopBeginAngle + delta);
+    this.setLoopEndAngle(this.loopEndAngle + delta);
   }
 
   addLineTo(line: Line) {

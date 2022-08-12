@@ -16,6 +16,7 @@ export class RDRepository {
   elements: Elem[] = [];
   idCount = 0;
   history: RepositoryCommand[] = [];
+  historyHead = 0;  // 次に書き込むべき位置を指す
 
   save(): string {
     const saveData = {} as any;
@@ -124,38 +125,9 @@ export class RDRepository {
   }
 
   doCommand(command: RepositoryCommand) {
-    this.history.push(command);
+    this.history[this.historyHead++] = command;
+    this.history.splice(this.historyHead);  // headから先の枝を切る
     command.action(this);
-  }
-
-  setVertex(vertex: Vector) {
-    const x = vertex.x;
-    const y = vertex.y;
-    this.vertexList.push(vertex);
-    this.elements.push(vertex);
-    // const currentIndex = this.currentIndex;
-    this.currentIndex = this.elements.length - 1;
-    // this.currentSubIndex = currentIndex;
-    loggerVer("currentIndex" + this.currentIndex);
-  }
-
-  setLoop(loop: Loop) {
-    const x = loop.origin.x;
-    const y = loop.origin.y;
-    this.loopList.push(loop);
-    this.elements.push(loop);
-    this.currentIndex = this.elements.length - 1;
-  }
-
-  setLine(line: Line) {
-    this.lineList.push(line);
-    this.elements.push(line);
-    this.currentIndex = this.elements.length - 1;
-  }
-
-  setMyString(str: MyString) {
-    this.elements.push(str);
-    this.currentIndex = this.elements.length - 1;
   }
 
   nextElem() {
@@ -274,5 +246,19 @@ export class RDRepository {
     const currentIndex = this.currentIndex;
     this.currentIndex = this.currentSubIndex;
     this.currentSubIndex = currentIndex;
+  }
+
+  undo() {
+    if (this.historyHead <= 0) {
+      return;
+    }
+    this.history[--this.historyHead].unaction(this);
+  }
+
+  redo() {
+    if (this.historyHead >= this.history.length) {
+      return;
+    }
+    this.history[this.historyHead++].action(this);
   }
 }

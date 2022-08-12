@@ -8,7 +8,7 @@ import { draw } from "./draw";
 import { DrawContext } from "./DrawContext";
 import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
-import { SetString, SetVertex, SetLoop, SetLine } from "./RepositoryCommand";
+import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, MoveAbsolute, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle } from "./RepositoryCommand";
 
 export class RDDraw {
   repository: RDRepository = new RDRepository();
@@ -20,6 +20,7 @@ export class RDDraw {
   clickIimeOutID?: NodeJS.Timeout = undefined;
   // private prevX: number = 0;
   // private prevY: number = 0;
+  private pointerPrev: Vector = new Vector(0, 0);
   rawPointer: Vector = new Vector(0, 0);
   stringMode?: string = undefined;
   isNoSelectMode: boolean = false;
@@ -275,40 +276,69 @@ export class RDDraw {
       this.changeScaleDown();
       return;
     }
+
+    if (ev.key == ">") {
+      this.redo();
+      return;
+    }
+
+    if (ev.key == "<") {
+      this.undo();
+      return;
+    }
   }
 
   drag(ev: MouseEvent) {
     loggerVer("drag");
     let current = this.repository.currentElement();
-    current?.moveAbsolute(this.getPointer().copy());
-    this.drawAll();
+    if (!current) {
+      return;
+    }
+    let pointer: Vector = this.getPointer();
+    if (!(pointer.x == this.pointerPrev.x && pointer.y == this.pointerPrev.y)) {
+      this.repository.doCommand(new MoveAbsolute(current, pointer.copy()));
+      this.drawAll();
+      this.pointerPrev = pointer;
+    }
   }
 
   keyUp() {
     loggerVer("keyUp");
     let current = this.repository.currentElement();
-    current?.move(new Vector(0, -1).multi(1 / config.scale));
+    if (!current) {
+      return;
+    }
+    this.repository.doCommand(new Move(current, new Vector(0, -1).multi(1 / config.scale)));
     this.drawAll();
   }
 
   keyRight() {
     loggerVer("keyRight");
     let current = this.repository.currentElement();
-    current?.move(new Vector(1, 0).multi(1 / config.scale));
+    if (!current) {
+      return;
+    }
+    this.repository.doCommand(new Move(current, new Vector(1, 0).multi(1 / config.scale)));
     this.drawAll();
   }
 
   keyLeft() {
     loggerVer("keyLeft");
     let current = this.repository.currentElement();
-    current?.move(new Vector(-1, 0).multi(1 / config.scale));
+    if (!current) {
+      return;
+    }
+    this.repository.doCommand(new Move(current, new Vector(-1, 0).multi(1 / config.scale)));
     this.drawAll();
   }
 
   keyDown() {
     loggerVer("keyDown");
     let current = this.repository.currentElement();
-    current?.move(new Vector(0, 1).multi(1 / config.scale));
+    if (!current) {
+      return;
+    }
+    this.repository.doCommand(new Move(current, new Vector(0, 1).multi(1 / config.scale)));
     this.drawAll();
   }
 
@@ -343,7 +373,7 @@ export class RDDraw {
   fill(x: number, y: number) {
     let current = this.repository.currentElement();
     if (current && isLoop(current)) {
-      current.fill = !current.fill;
+      this.repository.doCommand(new Fill(current));
       this.drawAll();
       return;
     }
@@ -577,13 +607,13 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      elem.rotation((2 * Math.PI) / 360);
+      this.repository.doCommand(new Rotation(elem, (2 * Math.PI) / 72));
       this.drawAll();
       return;
     }
     if (isLoop(elem)) {
-      this.changeArcAngle();
-      this.changeArcEndAngle();
+      this.repository.doCommand(new Rotation(elem, (2 * Math.PI) / 72));
+      this.drawAll();
       return;
     }
   }
@@ -597,13 +627,13 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      elem.rotation((-2 * Math.PI) / 72);
+      this.repository.doCommand(new Rotation(elem, -(2 * Math.PI) / 72));
       this.drawAll();
       return;
     }
     if (isLoop(elem)) {
-      this.changeArcAngleMinus();
-      this.changeArcEndAngleMinus();
+      this.repository.doCommand(new Rotation(elem, -(2 * Math.PI) / 72));
+      this.drawAll();
       return;
     }
   }
@@ -617,7 +647,7 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      elem.allow = !elem.allow;
+      this.repository.doCommand(new ArrowToggle(elem));
       this.drawAll();
       return;
     }
@@ -641,7 +671,7 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      elem.toggle();
+      this.repository.doCommand(new ChangeType(elem));
       this.drawAll();
       return;
     }
@@ -665,10 +695,7 @@ export class RDDraw {
     }
 
     if (isLoop(elem)) {
-      elem.loopBeginAngle = elem.loopBeginAngle + (2 * Math.PI) / 72;
-      if (elem.loopBeginAngle >= 2 * Math.PI) {
-        elem.loopBeginAngle = 0;
-      }
+      this.repository.doCommand(new ChangeArcAngle(elem, (2 * Math.PI) / 72));
       this.drawAll();
       return;
     }
@@ -688,10 +715,7 @@ export class RDDraw {
     }
 
     if (isLoop(elem)) {
-      elem.loopBeginAngle = elem.loopBeginAngle - (2 * Math.PI) / 72;
-      if (elem.loopBeginAngle < 0) {
-        elem.loopBeginAngle = 2 * Math.PI - (2 * Math.PI) / 72;
-      }
+      this.repository.doCommand(new ChangeArcAngle(elem, -(2 * Math.PI) / 72));
       this.drawAll();
       return;
     }
@@ -711,10 +735,9 @@ export class RDDraw {
     }
 
     if (isLoop(elem)) {
-      elem.loopEndAngle = elem.loopEndAngle + (2 * Math.PI) / 72;
-      if (elem.loopEndAngle >= 2 * Math.PI) {
-        elem.loopEndAngle = 0;
-      }
+      this.repository.doCommand(
+        new ChangeArcEndAngle(elem, (2 * Math.PI) / 72)
+      );
       this.drawAll();
       return;
     }
@@ -734,10 +757,9 @@ export class RDDraw {
     }
 
     if (isLoop(elem)) {
-      elem.loopEndAngle = elem.loopEndAngle - (2 * Math.PI) / 72;
-      if (elem.loopEndAngle < 0) {
-        elem.loopEndAngle = 2 * Math.PI - (2 * Math.PI) / 72;
-      }
+      this.repository.doCommand(
+        new ChangeArcEndAngle(elem, -(2 * Math.PI) / 72)
+      );
       this.drawAll();
       return;
     }
@@ -752,12 +774,12 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      elem.to = elem.to.add(elem.directionUnit());
+      this.repository.doCommand(new ChangeScale(elem, 1.0));
       this.drawAll();
       return;
     }
     if (isLoop(elem)) {
-      elem.radius = elem.radius + 1;
+      this.repository.doCommand(new ChangeScale(elem, 1.0));
       this.drawAll();
       return;
     }
@@ -772,15 +794,12 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      elem.to = elem.to.add(elem.directionUnit().multi(-1));
+      this.repository.doCommand(new ChangeScale(elem, -1.0));
       this.drawAll();
       return;
     }
     if (isLoop(elem)) {
-      elem.radius = elem.radius - 1;
-      if (elem.radius < 1) {
-        elem.radius = 1;
-      }
+      this.repository.doCommand(new ChangeScale(elem, -1.0));
       this.drawAll();
       return;
     }
@@ -795,63 +814,23 @@ export class RDDraw {
       return;
     }
     if (isLine(elem)) {
-      if (elem.style == "normal") {
-        elem.style = "dash";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "dash") {
-        elem.style = "wave";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "wave") {
-        elem.style = "coil";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "coil") {
-        elem.style = "double";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "double") {
-        elem.style = "normal";
-        this.drawAll();
-        return;
-      }
+      this.repository.doCommand(new ChangeStyle(elem));
       this.drawAll();
       return;
     }
     if (isLoop(elem)) {
-      if (elem.style == "normal") {
-        elem.style = "dash";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "dash") {
-        elem.style = "wave";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "wave") {
-        elem.style = "coil";
-        this.drawAll();
-        return;
-      }
-      if (elem.style == "coil") {
-        elem.style = "normal";
-        this.drawAll();
-        return;
-      }
-
+      this.repository.doCommand(new ChangeStyle(elem));
       this.drawAll();
       return;
     }
   }
 
   delete() {
-    this.repository.deleteCurrentEelemnt();
+    let current = this.repository.currentElement();
+    if (!current) {
+      return;
+    }
+    this.repository.doCommand(new Delete(current));
     this.drawAll();
   }
 
@@ -862,6 +841,18 @@ export class RDDraw {
 
   subSelect(point: Vector) {
     this.repository.subSelect(point);
+    this.drawAll();
+  }
+
+  undo() {
+    loggerVer("undo");
+    this.repository.undo();
+    this.drawAll();
+  }
+
+  redo() {
+    loggerVer("redo");
+    this.repository.redo();
     this.drawAll();
   }
 }
