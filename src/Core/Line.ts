@@ -6,6 +6,13 @@ import { makeVector, Vector } from "./Vector";
 export type LineStyle = "normal" | "dash" | "wave" | "coil" | "double"; //
 // wave https://stackoverflow.com/questions/29917446/drawing-sine-wave-in-canvas
 
+/**
+ * A Line is a Elem that is a line.
+ * It has a label, a style, and a labelDiff.
+ * It can be rotated, and it can be toggled.
+ * It can be copied, and it can be saved to a JSON object.
+ * It can also be described as a string.
+ */
 export class Line implements Elem {
   id: string;
   shape: "Line" = "Line";

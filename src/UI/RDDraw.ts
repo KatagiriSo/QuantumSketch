@@ -6,10 +6,39 @@ import { Vector, isVector } from "../Core/Vector";
 import { loggerVer, loggerOn } from "../looger";
 import { draw } from "./draw";
 import { DrawContext } from "./DrawContext";
+import { DrawMode } from "./DrawMode";
 import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
 import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, MoveAbsolute, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle } from "./RepositoryCommand";
 
+/**
+ * Draw class for draw and mouse event
+ * @description
+ * 1. Draw
+ * 2. Mouse Event
+ * 3. Key Event
+ * 4. Repository Command
+ * 5. Export
+ * 6. Import
+ * 7. Undo
+ * 8. Redo
+ * 9. Select
+ * 10. Move
+ * 11. Delete
+ * 12. Change Style
+ * 13. Change Type
+ * 14. Change Scale
+ * 15. Change Arc Angle
+ * 16. Change Arc End Angle
+ * 17. Fill
+ * 18. Arrow Toggle
+ * 19. Rotation
+ * 20. Change String
+ * 21. Change Vertex
+ * 22. Change Loop
+ * 23. Change Line
+ * 24. Change String
+ */
 export class RDDraw {
   repository: RDRepository = new RDRepository();
   canvas: HTMLCanvasElement;
@@ -23,12 +52,15 @@ export class RDDraw {
   private pointerPrev: Vector = new Vector(0, 0);
   rawPointer: Vector = new Vector(0, 0);
   stringMode?: string = undefined;
+  drawMode: DrawMode = "line";
+  lineMode?: Vector = undefined;
   isNoSelectMode: boolean = false;
   constructor(canvas: HTMLCanvasElement, drawContext: DrawContext) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d")!;
     this.drawContext = drawContext;
     this.bind();
+    this.drawAll();
   }
 
   bind() {
@@ -286,6 +318,11 @@ export class RDDraw {
       this.undo();
       return;
     }
+
+    if (ev.key == "m") {
+      this.changeMode();
+      return;
+    }
   }
 
   drag(ev: MouseEvent) {
@@ -465,6 +502,10 @@ export class RDDraw {
         "current"
       );
     }
+
+    this.drawContext.output(this.drawMode, "html", "mode");
+
+
     this.drawContext.closePath();
   }
 
@@ -835,12 +876,71 @@ export class RDDraw {
   }
 
   select(point: Vector) {
-    this.repository.select(point);
-    this.drawAll();
+    if (this.drawMode == "point") {
+      this.putVertex(point);
+      this.drawAll();
+      return;
+    }
+    if (this.drawMode == "line") {
+      if (this.lineMode) {
+        this.putLine(point, false);
+        this.putVertex(point);
+        this.lineMode = undefined;
+        this.drawAll();
+        return;
+      }
+      this.lineMode = point
+      this.putVertex(this.lineMode);
+      this.drawAll();
+      return;
+    }
+    if (this.drawMode == "loop") {
+      const current = this.repository.currentElement();
+      if (!current) {
+          this.putLoop(point.x, point.y);
+          this.drawAll();
+          return;
+      }
+      if (isLoop(current)) {
+        let loop = new Loop();
+        loop.origin = point
+        current.addLoop(loop);
+        this.repository.doCommand(new SetLoop(loop));
+        this.drawAll();
+        return;
+      }
+      if (isLine(current)) {
+        let loop = new Loop();
+        loop.origin = current.to.add(current.directionUnit().multi(loop.radius*2))
+        this.repository.doCommand(new SetLoop(loop));
+        this.drawAll();
+        return;
+      }
+      if (isVector(current)) {
+        let loop = new Loop();
+        loop.origin = current
+        this.repository.doCommand(new SetLoop(loop));
+        this.drawAll();
+        return;
+      }
+    }   
+    if (this.drawMode == "string") {
+      this.setString(point.x, point.y);
+      this.drawAll();
+    }
+    if (this.drawMode == "normal") {
+      this.repository.select(point);
+      this.drawAll();
+    }
   }
 
   subSelect(point: Vector) {
-    this.repository.subSelect(point);
+    if (this.drawMode == "normal") {
+      this.repository.subSelect(point);
+      this.drawAll();
+      return;
+    }
+    this.repository.select(point);
     this.drawAll();
   }
 
@@ -853,6 +953,17 @@ export class RDDraw {
   redo() {
     loggerVer("redo");
     this.repository.redo();
+    this.drawAll();
+  }
+
+  changeMode() {
+    if (this.drawMode == "normal") {
+      this.drawMode = "line";
+    } else if (this.drawMode == "line") {
+      this.drawMode = "loop";
+    } else if (this.drawMode == "loop") {
+      this.drawMode = "normal";
+    }
     this.drawAll();
   }
 }

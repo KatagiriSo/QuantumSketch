@@ -2,6 +2,13 @@ import { Elem, getElemID } from "./Elem";
 import { Shape } from "./Shape";
 import { Vector } from "./Vector";
 
+/**
+ * A MyString is a String that can be moved around the screen.
+ * It has a unique ID, a Shape, and a location.
+ * It can be moved by a delta, or moved to an absolute location.
+ * It can be copied, and it can be saved to a JSON object.
+ * It can also be described as a string.
+ */
 export class MyString implements Elem {
   id: string;
   shape: "String" = "String";

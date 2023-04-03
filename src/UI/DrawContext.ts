@@ -6,6 +6,11 @@ import { loggerVer } from "../looger";
 import { ExportType } from "./ExportType";
 import { getColor } from "./UIColor";
 
+/**
+ * DrawContext
+ * 
+ * This class is used to draw on canvas. 
+ */
 export class DrawContext {
   exportType: ExportType = "canvas";
   private canvasContext: CanvasRenderingContext2D;
@@ -17,7 +22,10 @@ export class DrawContext {
     this.canvasContext.font = "25px Arial";
   }
 
-  output(desc: string, exportType: "html", id: "sub" | "current") {
+  /**
+   * output is used to output the result of drawing.
+   */
+  output(desc: string, exportType: "html", id: "sub" | "current" | "mode") {
     if (this.exportType == "canvas") {
       if (id == "sub") {
         let selector = document.querySelector("div#sub") as HTMLElement;
@@ -29,9 +37,17 @@ export class DrawContext {
         selector.textContent = desc;
         return;
       }
+      if (id == "mode") {
+        let selector = document.querySelector("div#mode") as HTMLElement;
+        selector.textContent = desc;
+        return;
+      }
     }
   }
 
+  /**
+   * set the color of stroke.
+   */
   setStrokeColor(color: Color) {
     if (this.exportType == "canvas") {
       this.canvasContext.strokeStyle = getColor(color);
@@ -39,6 +55,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * set the color of fill.
+   */
   setFillColor(color: Color) {
     if (this.exportType == "canvas") {
       this.canvasContext.fillStyle = getColor(color);
@@ -46,6 +65,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * set export type.
+   */
   setExportType(exportType: ExportType) {
     this.exportType = exportType;
     if (exportType == "canvas") {
@@ -59,6 +81,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * begin path.
+   */
   beginPath() {
     if (this.exportType == "canvas") {
       this.canvasContext.beginPath();
@@ -66,10 +91,16 @@ export class DrawContext {
     }
   }
 
+  /**
+   * move to a point.
+   */
   moveTo(x: number, y: number) {
     this.coordinate = new Vector(x, y);
   }
 
+  /**
+   * close path.
+   */
   closePath() {
     if (this.exportType == "canvas") {
       this.canvasContext.closePath();
@@ -87,10 +118,16 @@ export class DrawContext {
   //     this.loopDashStyle = style
   // }
 
+  /**
+   * add string for export.
+   */
   addExport(txt: String) {
     this.exportString += txt;
   }
 
+  /**
+   * set line into point (x,y).
+   */
   lineTo(x: number, y_: number, linestyle: LineStyle) {
     if (this.exportType == "canvas") {
       let y = y_;
@@ -197,6 +234,9 @@ export class DrawContext {
   //     }
   // }
 
+  /**
+   * fill rectangle.
+   */
   fillRect(x: number, y_: number, w: number, h: number) {
     if (this.exportType == "canvas") {
       let y = y_;
@@ -211,6 +251,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * clear rectangle.
+   */
   clearRect() {
     if (this.exportType == "canvas") {
       this.canvasContext.clearRect(
@@ -229,6 +272,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * stroke.
+   */
   stroke() {
     if (this.exportType == "canvas") {
       this.canvasContext.stroke();
@@ -236,6 +282,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * fill text
+   */
   fillText(txt: string, x: number, y: number) {
     if (this.exportType == "canvas") {
       this.canvasContext.fillText(txt, x * this.scale, y * this.scale);
@@ -259,6 +308,9 @@ export class DrawContext {
     }
   }
 
+  /**
+   * draw arc
+   */
   arc(
     x: number,
     y_: number,
@@ -426,6 +478,9 @@ export class DrawContext {
     return;
   }
 
+  /**
+   * return export string
+   */
   endExport(): string {
     if (this.exportType == "tikz") {
       this.addExport("\\end{tikzpicture}\n ");
@@ -454,12 +509,18 @@ export class DrawContext {
     return "";
   }
 
+  /**
+   *  save data
+   */
   insertsavedata(saveData: string) {
     if (this.exportType == "svg") {
       this.addExport(`<!-- QuantumSketchSaveDataStart@${saveData}@ -->`)
     }
   }
 
+  /**
+   * file download
+   */
   fildDownload(content: string) {
     const blob = new Blob([content], { type: "text/plain" });
 

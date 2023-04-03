@@ -1,0 +1,1 @@
+export type DrawMode = "normal" | "point" | "line" | "loop" | "string";

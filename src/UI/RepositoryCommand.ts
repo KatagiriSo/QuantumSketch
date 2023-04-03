@@ -5,6 +5,12 @@ import { MyString } from "../Core/MyString";
 import { Vector, isVector } from "../Core/Vector";
 import { RDRepository } from "./RDRepository";
 
+/**
+ * A RepositoryCommand is a command that can be executed on a repository.
+ * It can be undone, and redone.
+ * It can be saved to a JSON object.
+ * It can also be described as a string.
+ */
 export interface RepositoryCommand {
   action(repo: RDRepository): void;
   unaction(repo: RDRepository): void;

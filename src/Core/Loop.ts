@@ -4,6 +4,12 @@ import { LineStyle, Line } from "./Line";
 import { Shape } from "./Shape";
 import { Vector, direction, makeVector } from "./Vector";
 
+/**
+ * A Loop is a Line that is a loop.
+ * It has a radius, and a begin and end angle.
+ * It can be copied, and it can be saved to a JSON object.
+ * It can also be described as a string.
+ */
 export class Loop implements Elem {
   id: string;
   shape: "Loop" = "Loop";
@@ -98,6 +104,11 @@ export class Loop implements Elem {
     line.origin = this.origin.add(
       direction(line.to, this.origin).unit().multi(this.radius)
     );
+  }
+  addLoop(loop: Loop) {
+    loop.origin = this.origin.add(
+      direction(loop.origin, this.origin).unit().multi(this.radius)
+    )
   }
 
   formalDistance(point: Vector): number {

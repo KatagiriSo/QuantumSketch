@@ -1,6 +1,19 @@
 import { Elem, getElemID } from "./Elem";
 import { Shape } from "./Shape";
 
+/**
+ * A Vector is a point in 2D space.
+ * It has a unique ID, a Shape, and a location.
+ * It can be moved by a delta, or moved to an absolute location.
+ * It can be copied, and it can be saved to a JSON object.
+ * It can also be described as a string.
+ * It can be added to another Vector, or subtracted from another Vector.
+ * It can be multiplied by a number.
+ * It can be rotated by an angle.
+ * It can be converted to a unit vector.
+ * It can be converted to a floor vector.
+ * It can be converted to a vector with integer coordinates.
+ */
 export class Vector implements Elem {
   id: string;
   shape: Shape = "Point";

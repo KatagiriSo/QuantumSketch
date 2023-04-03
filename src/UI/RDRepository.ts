@@ -7,6 +7,15 @@ import { makeVector, Vector } from "../Core/Vector";
 import { loggerVer } from "../looger";
 import { RepositoryCommand } from "./RepositoryCommand";
 
+/**
+ * The repository of the drawing.
+ * It has a list of elements, and it can save and load.
+ * It can also get the current element.
+ * It can also get all the vertex, loop, and line.
+ * It can also get the current element.
+ * It can also get the current sub element.
+ * It can also set the current element.
+ */
 export class RDRepository {
   vertexList: Vector[] = [];
   loopList: Loop[] = [];

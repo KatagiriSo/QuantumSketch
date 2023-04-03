@@ -11,6 +11,13 @@ import { DrawContext } from "./DrawContext";
 import { ExportType } from "./ExportType";
 import { getColor } from "./UIColor";
 
+/**
+ * draw is the main function to draw an element.
+ * @param drawContext the draw context
+ * @param elem the element to draw
+ * @param exportType the export type 
+ * @param color the color
+ */
 export function draw(
   drawContext: DrawContext,
   elem: Elem,
@@ -37,6 +44,9 @@ export function draw(
   }
 }
 
+/**
+ * draw DoubleLine
+ */
 export function drawDoubleLine(
   drawContext: DrawContext,
   line: Line,
@@ -80,6 +90,9 @@ export function drawDoubleLine(
   // drawContext.setLineDash([])
 }
 
+/**
+ * draw a line
+ */
 export function drawNormalLine(
   drawContext: DrawContext,
   line: Line,
@@ -164,6 +177,9 @@ export function drawWaveLine(
   // drawContext.setLineDash([])
 }
 
+/**
+ * draw a coil line
+ */
 export function drawCoilLine(
   drawContext: DrawContext,
   line: Line,
@@ -284,6 +300,9 @@ export function drawCoilLine(
   // drawContext.setLineDash([])
 }
 
+/**
+ * draw line
+ */
 export function drawLine(
   drawContext: DrawContext,
   line: Line,
@@ -315,6 +334,9 @@ export function drawLine(
 
 }
 
+/**
+ * draw allow
+ */
 export function drawAllow(
   drawContext: DrawContext,
   line: Line,
@@ -345,6 +367,9 @@ export function drawAllow(
   drawContext.stroke();
 }
 
+/**
+ * draw wave loop
+ */
 export function drawWaveLoop(
   drawContext: DrawContext,
   loop: Loop,
@@ -426,6 +451,9 @@ export function drawWaveLoop(
   // drawContext.setLineDash([])
 }
 
+/**
+ * draw coil loop
+ */
 export function drawCoilLoop(
   drawContext: DrawContext,
   loop: Loop,
@@ -575,6 +603,9 @@ export function drawCoilLoop(
 */
 }
 
+/**
+ * draw a loop
+ */
 export function drawLoop(
   drawContext: DrawContext,
   loop: Loop,
@@ -642,6 +673,10 @@ export function drawLoop(
   // drawContext.setLineDash([])
 }
 
+
+/**
+ * draw point
+ */
 export function drawPoint(
   drawContext: DrawContext,
   point: Vector,
