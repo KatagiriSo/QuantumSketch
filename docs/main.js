@@ -156,7 +156,7 @@ eval("__webpack_require__.r(__webpack_exports__);\n/* harmony export */ __webpac
   \******************************/
 /***/ ((__unused_webpack_module, __webpack_exports__, __webpack_require__) => {
 
-eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./UI/DrawContext */ \"./src/UI/DrawContext.ts\");\n/* harmony import */ var _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./UI/RDDraw */ \"./src/UI/RDDraw.ts\");\n// \"QuantumSketch  So Katagiri\"\n\n\nvar canvas = document.getElementById(\"canvas\");\nvar context_ = canvas.getContext(\"2d\");\nvar drawContext = new _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__.DrawContext(context_);\nvar h = new _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__.RDDraw(canvas, drawContext);\n// console.log(clossLoop(drawContext));\n\n\n//# sourceURL=webpack://rdfeyn/./src/quantumSketch.ts?");
+eval("__webpack_require__.r(__webpack_exports__);\n/* harmony import */ var _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./UI/DrawContext */ \"./src/UI/DrawContext.ts\");\n/* harmony import */ var _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./UI/RDDraw */ \"./src/UI/RDDraw.ts\");\n// \"QuantumSketch  So Katagiri\"\n\n\nvar canvas = document.getElementById(\"canvas\");\nvar context_ = canvas.getContext(\"2d\");\nvar drawContext = new _UI_DrawContext__WEBPACK_IMPORTED_MODULE_0__.DrawContext(context_);\nvar h = new _UI_RDDraw__WEBPACK_IMPORTED_MODULE_1__.RDDraw(canvas, drawContext);\n// drawFourScalarVertex(drawContext)\n\n\n//# sourceURL=webpack://rdfeyn/./src/quantumSketch.ts?");
 
 /***/ })
 

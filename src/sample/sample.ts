@@ -148,10 +148,17 @@ export function clossLoop(drawContext: DrawContext) : string {
     boson_L_Line.origin = new Vector(0, 0)
     boson_R_Line.to = new Vector(16,0)
 
+    return drawALl(drawContext, list)
+}
+
+function drawALl(drawContext: DrawContext, list:Elem[]): string {
+    drawContext.setExportType("canvas")
+    list.forEach((x) => draw(drawContext, x, "canvas"));
     drawContext.setExportType("svg")
     drawContext.startExport();
     list.forEach((x) => draw(drawContext, x, "svg"));
     const result = drawContext.endExport();
+    console.log(result)
     return result
 }
 
@@ -190,5 +197,51 @@ function kakanzuTest(context: DrawContext) {
     });
 }
 
+
+namespace V {
+    export const zero = new Vector(0, 0);
+    export const one = new Vector(1, 1);
+    export const up = (num:number) => new Vector(0, 1).multi(num);
+    export const down = (num:number) => new Vector(0, -1).multi(num);
+    export const left = (num:number) => new Vector(-1, 0).multi(num);
+    export const right = (num:number) => new Vector(1, 0).multi(num);
+    export const upLeft = (num:number) => new Vector(-1, 1).multi(num);
+    export const upRight = (num:number) => new Vector(1, 1).multi(num);
+    export const downLeft = (num:number) => new Vector(-1, -1).multi(num);
+    export const downRight = (num:number) => new Vector(1, -1).multi(num);
+}
+
+
+
+
+
+
+export function drawFourScalarVertex(context: DrawContext) {
+    let vertex = new Vertex();
+    let line1 = new Line();
+    let line2 = new Line();
+    let line3 = new Line();
+    let line4 = new Line();
+    let elems = [vertex, line1, line2, line3, line4];
+
+    vertex.origin = new Vector(6, 6);
+    line1.origin = vertex.origin.add(V.upLeft(3));
+    line2.origin = vertex.origin.add(V.upRight(3));
+    line3.origin = vertex.origin.add(V.downLeft(3));
+    line4.origin = vertex.origin.add(V.downRight(3));
+    
+
+    line1.to = vertex.origin;
+    line2.to = vertex.origin;
+    line3.to = vertex.origin;
+    line4.to = vertex.origin;
+
+    elems.forEach((x) => {
+        draw(context, x, "canvas");
+    });
+}
+
 // const context = getContext()
 // draw2loop()
+
+

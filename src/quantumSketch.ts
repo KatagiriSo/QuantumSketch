@@ -1,6 +1,6 @@
 // "QuantumSketch  So Katagiri"
 
-import { clossLoop, draw2loop } from "./sample/sample";
+import { clossLoop, draw2loop, drawFourScalarVertex } from "./sample/sample";
 import { DrawContext } from "./UI/DrawContext"
 import { RDDraw } from "./UI/RDDraw"
 
@@ -10,4 +10,4 @@ let context_ = canvas.getContext("2d")!
 let drawContext = new DrawContext(context_);
 const h = new RDDraw(canvas, drawContext)
 
-// console.log(clossLoop(drawContext));
+// drawFourScalarVertex(drawContext)
