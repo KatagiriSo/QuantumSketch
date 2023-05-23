@@ -1,4 +1,4 @@
 /**
  * The shape of a path.
  */
-export type Shape = "Line" | "Loop" | "Point" | "String";
+export type Shape = "Line" | "Loop" | "Point" | "String" | "Group"

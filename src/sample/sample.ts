@@ -1,4 +1,5 @@
 import { Elem } from "../Core/Elem";
+import { Group } from "../Core/Group";
 import { Line } from "../Core/Line";
 import { Loop } from "../Core/Loop";
 import { Vector } from "../Core/Vector";
@@ -244,4 +245,25 @@ export function drawFourScalarVertex(context: DrawContext) {
 // const context = getContext()
 // draw2loop()
 
+/**
+ * ループの任意の角度から任意の角度までの線を引く
+ */
+function loopInLoop(): Elem {
+    let loop1 = new Loop();
+    loop1.origin = new Vector(9, 6);
+    loop1.setLoopBeginAngle(2*Math.PI/3)
+    loop1.setLoopEndAngle(4*Math.PI/3)
+    loop1.radius = 4;
+    let loop2 = new Loop();
+    loop2.origin = new Vector(5, 6);
+    loop2.radius = 4;
+    const group = new Group([loop1, loop2])
+    return group
+}
 
+
+
+
+export function sample(context: DrawContext) {
+    drawALl(context, [loopInLoop()])
+}

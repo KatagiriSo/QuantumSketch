@@ -1,6 +1,7 @@
 import { config } from "../Config";
 import { Color } from "../Core/Color";
 import { Elem } from "../Core/Elem";
+import { isGroup } from "../Core/Group";
 import { Line, LineStyle } from "../Core/Line";
 import { Loop } from "../Core/Loop";
 import { MyString } from "../Core/MyString";
@@ -40,6 +41,12 @@ export function draw(
 
   if (elem.shape == "String") {
     drawText(drawContext, elem as MyString, exportType, color);
+    return;
+  }
+  if (isGroup(elem)) {
+    elem.elements.forEach((elem) => {
+      draw(drawContext, elem, exportType, color);
+    });
     return;
   }
 }
