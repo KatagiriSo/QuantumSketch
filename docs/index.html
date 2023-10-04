@@ -7,6 +7,8 @@
     <title>QuantumSketch</title>
     <meta name="description" content="">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
     <link rel="stylesheet" href="">
 </head>
 <style type="text/css">
@@ -46,20 +48,29 @@
     }
 
     div.canvas_box {
-        display: inline-block;
+        display: block;
         border-left: solid 5px black;
         border-right: solid 5px black;
         border-bottom: solid 1px gray;
         border-top: solid 1px gray;
 
         padding: 0px;
+        margin: auto;
+        width: 640px;
+        height: 480px;
+        box-sizing: content-box;
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
     }
 
     div#sub {
-        border-bottom: solid 1px greenyellow;
+/*      border-bottom: solid 1px greenyellow; */
     }
     div#current {
-        border-bottom: solid 1px red;
+/*      border-bottom: solid 1px red; */
     }
 
         help {
@@ -75,67 +86,187 @@
 <body>
     <!--[if lt IE 7]>
             <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
-        <![endif]-->
-    <a href="https://github.com/KatagiriSo/QuantumSketch">QuantumSketch ver. 1.1.0 by So Katagiri</a>
-    <div class="canvas_box">
-        <canvas id="canvas" width="640" height="480"></canvas>
-    </div>
-    <div><div id="mode">mode</div>
-    <div><div id = "current"></div><div id="sub"></div></div>
-    <a id="download" href="#" download="diagram.svg" onclick="" hidden>ダウンロード</a>
-    <div class="add">
-        <p>Mode Change [m]</p>
-        <p>Add Point [v]</p>
-        <p>Add Loop [l]</p>
-        <p>Draw Propagator [p]</p>
-        <p>Draw Propagator2 [-]</p>
-    </div>
-    <div class="select">
-        <p>(Red) Select [click]</p>
-        <p>Sub (green) select [double click]</p>
-        <p>Select reverse [c]</p>
-        <p>Next select [n]</p>
-        <p>Back select [b]</p>
-        <p>Next sub select [s]</p>
-        <p>Back sub select [a]</p>
-    </div>
-    <div class="linestyle">
-        <p>Allow direction change [t]</p>
-        <p>Line style change [q]</p>
-        <p>Remove arrow [@]</p>
-        <p>fill loop [f] </p>
-        <p>Scale up [w]</p>
-        <p>Scale down [x]</p>
-        <p>Arc angle change [W,X,E,C]</p>
-        <p>rotation [r, R]</p>
+    <![endif]-->
+
+    <nav class="navbar navbar-expand-md fixed-top bg-body-tertiary border-bottom shadow-sm">
+        <div class="container">
+            <!-- Branding Image -->
+            <a class="navbar-brand" href="">Quantum Sketch</a>
+
+            <!-- Collapsed Hamburger -->
+            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbar">
+                <!-- Left Side Of Navbar -->
+                <ul class="navbar-nav me-auto">
+                </ul>
+
+                <!-- Right Side Of Navbar -->
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a href="" id="nav-undo" class="nav-link"><i class="bi bi-arrow-counterclockwise"></i> Undo</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="" id="nav-redo" class="nav-link"><i class="bi bi-arrow-clockwise"></i> Redo</a>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a href="" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-file-earmark"></i> Export</a>
+                        <ul class="dropdown-menu">
+                            <li><a href="" id="nav-export-tikz" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modal-export-tikz">Tikz text</a></li>
+                            <li><a href="" id="nav-export-svg" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modal-export-svg">SVG text</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a href="" id="download" class="dropdown-item" download="diagram.svg">SVG download</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item">
+                        <a href="" id="nav-help" class="nav-link" data-bs-toggle="modal" data-bs-target="#modal-help"><i class="bi bi-info-circle"></i> Help</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid">
+        <div class="canvas_box">
+            <canvas id="canvas" width="640" height="480"></canvas>
+        </div>
     </div>
 
-    <div class="move">
-        <p>Up select target [8]</p>
-        <p>Right select target [6]</p>
-        <p>Left select target [4]</p>
-        <p>Down select target [2]</p>
+    <!-- Mode -->
+    <div class="position-fixed start-0" style = "width: 8rem; top: 4rem;">
+        <div id="mode" class="border rounded-pill bg-body-tertiary shadow-sm text-center m-2 p-2">mode</div>
     </div>
-    <div class="mode">
-        <p>No select mode In/Out [z]</p>
-        <p>String Input [/]</p>
-        <p>copy [ctr + c]</p>
-        <p>Export tikz text [e]</p>
-        <p>Export svg text [ctr + e]</p>
-        <p>Undo [<]</p>
-        <p>Redo [>]</p>
-    </div>
-    <help>
-            <p>\documentclass[10pt]{article}</p>
-            <p>\usepackage{amsmath}</p>
-            <p>\usepackage{tikz} </p>
-            <p>\usetikzlibrary{intersections, calc, arrows, snakes, decorations} </p>
-            <p>\begin{document}</p>
-            <p>\end{document}</p>
-    </help>
-    <div> OutPut</div>
 
-    <div id="output"></div>
+    <!-- Detail of Selected Element -->
+    <div class="position-fixed bottom-0 start-0" style = "width: 25rem;">
+        <div class="border bg-body-tertiary shadow-sm m-2 p-1">
+            <div id="current" class="text-danger m-1">-</div>
+            <hr class="border m-1">
+            <div id="sub" class="text-success m-1">-</div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="position-fixed bottom-0 end-0">
+        <div class="border rounded-pill bg-body-tertiary shadow-sm m-2 px-4 py-1">
+            <a href="https://github.com/KatagiriSo/QuantumSketch" target="_blank" rel="noopener noreferrer" class="-link-secondary text-decoration-none"><small>QuantumSketch ver. 1.1.0 by So Katagiri</small></a>
+        </div>
+    </footer>
+
+    <!-- Modal help -->
+    <div class="modal fade" id="modal-help" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5">Keyboard shortcuts</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="add">
+                        <p>Mode Change [m]</p>
+                        <p>Add Point [v]</p>
+                        <p>Add Loop [l]</p>
+                        <p>Draw Propagator [p]</p>
+                        <p>Draw Propagator2 [-]</p>
+                    </div>
+                    <div class="select">
+                        <p>(Red) Select [click]</p>
+                        <p>Sub (green) select [double click]</p>
+                        <p>Select reverse [c]</p>
+                        <p>Next select [n]</p>
+                        <p>Back select [b]</p>
+                        <p>Next sub select [s]</p>
+                        <p>Back sub select [a]</p>
+                    </div>
+                    <div class="linestyle">
+                        <p>Allow direction change [t]</p>
+                        <p>Line style change [q]</p>
+                        <p>Remove arrow [@]</p>
+                        <p>fill loop [f] </p>
+                        <p>Scale up [w]</p>
+                        <p>Scale down [x]</p>
+                        <p>Arc angle change [W,X,E,C]</p>
+                        <p>rotation [r, R]</p>
+                    </div>
+                    <div class="move">
+                        <p>Up select target [8]</p>
+                        <p>Right select target [6]</p>
+                        <p>Left select target [4]</p>
+                        <p>Down select target [2]</p>
+                    </div>
+                    <div class="mode">
+                        <p>No select mode In/Out [z]</p>
+                        <p>String Input [/]</p>
+                        <p>copy [ctr + c]</p>
+                        <p>Export tikz text [e]</p>
+                        <p>Export svg text [ctr + e]</p>
+                        <p>Undo [<]</p>
+                        <p>Redo [>]</p>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal tikz -->
+    <div class="modal fade" id="modal-export-tikz" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5">Tikz</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <h3 class="fs-5">Preamble</h3>
+                    <div class="border bg-body-tertiary m-2 px-3 py-2 font-monospace">
+                        \documentclass[10pt]{article}<br>
+                        \usepackage{amsmath}<br>
+                        \usepackage{tikz}<br>
+                        \usetikzlibrary{intersections, calc, arrows, snakes, decorations}<br>
+                        \begin{document}<br>
+                        \end{document}<br>
+                    </div>
+                    <h3 class="fs-5">Command</h3>
+                    <div id="output-tikz"class="border bg-body-tertiary m-2 px-3 py-2 font-monospace"></div>
+                </div>
+
+                <div class="modal-footer">
+                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal SVG -->
+    <div class="modal fade" id="modal-export-svg" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title fs-5">SVG</h2>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div id="output-svg" class="border bg-body-tertiary m-2 px-3 py-2 font-monospace"></div>
+                </div>
+
+                <div class="modal-footer">
+                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
     <script src="main.js" async defer></script>
 </body>
 
