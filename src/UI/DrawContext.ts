@@ -143,6 +143,7 @@ export class DrawContext {
         this.coordinate.y * this.scale
       );
       this.canvasContext.lineTo(x * this.scale, y * this.scale);
+      this.coordinate = new Vector(x, y);
       return;
     }
 
@@ -208,6 +209,7 @@ export class DrawContext {
             .y}) -- (${x},${y});\n`
         );
       }
+      this.coordinate = new Vector(x, y_);
       return;
     }
 
@@ -223,6 +225,7 @@ export class DrawContext {
           y_ * this.scale
         }" stroke="black" ${dash}/>`
       );
+      this.coordinate = new Vector(x, y_);
       return;
     }
   }

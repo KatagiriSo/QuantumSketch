@@ -294,6 +294,9 @@ export class ArrowToggle implements RepositoryCommand {
     if (isLine(this.target)) {
       this.target.allow = !this.target.allow;
     }
+    if (isLoop(this.target)) {
+      this.target.allow = !this.target.allow;
+    }
   }
 
   unaction(repo: RDRepository): void {
@@ -316,6 +319,58 @@ export class ChangeType implements RepositoryCommand {
 
   unaction(repo: RDRepository): void {
     this.action(repo);
+  }
+}
+
+export class RotateArrow implements RepositoryCommand {
+  targets: Line[];
+  before: number[];
+  delta: number;
+
+  constructor(targets: Line[], delta: number) {
+    this.targets = targets;
+    this.before = targets.map((line) => line.arrowRotation ?? 0);
+    this.delta = delta;
+  }
+
+  action(repo: RDRepository): void {
+    this.targets.forEach((line, index) => {
+      line.arrowRotation = this.before[index] + this.delta;
+    });
+  }
+
+  unaction(repo: RDRepository): void {
+    this.targets.forEach((line, index) => {
+      line.arrowRotation = this.before[index];
+    });
+  }
+}
+
+export class SetArrowRotation implements RepositoryCommand {
+  targets: Line[];
+  before: number[];
+  after: number[];
+
+  constructor(targets: Line[], after: number | number[]) {
+    this.targets = targets;
+    this.before = targets.map((line) => line.arrowRotation ?? 0);
+    if (Array.isArray(after)) {
+      this.after = after;
+    } else {
+      this.after = targets.map(() => after);
+    }
+  }
+
+  action(repo: RDRepository): void {
+    this.targets.forEach((line, index) => {
+      line.arrowRotation = this.after[index];
+    });
+  }
+
+  unaction(repo: RDRepository): void {
+    this.targets.forEach((line, index) => {
+      line.arrowRotation = this.before[index];
+    });
   }
 }
 
@@ -366,5 +421,218 @@ export class ChangeStyle implements RepositoryCommand {
 
   unaction(repo: RDRepository): void {
     this.target.style = this.styleBefore;
+  }
+}
+
+export class MoveGroup implements RepositoryCommand {
+  targets: Elem[];
+  delta: Vector;
+  before: Elem[] = [];
+
+  constructor(targets: Elem[], delta: Vector) {
+    this.targets = targets;
+    this.delta = delta;
+    this.before = targets.map((target) => {
+      const cloned = JSON.parse(JSON.stringify(target));
+      Object.defineProperties(cloned, Object.getOwnPropertyDescriptors(target));
+      return cloned;
+    });
+  }
+
+  action(repo: RDRepository): void {
+    this.targets.forEach((target) => {
+      target.move(this.delta);
+    });
+  }
+
+  unaction(repo: RDRepository): void {
+    this.targets.forEach((target, index) => {
+      Object.assign(target, this.before[index]);
+    });
+  }
+}
+
+export class DeleteGroup implements RepositoryCommand {
+  targets: Elem[];
+  snapshots: { elem: Elem; index: number }[] = [];
+
+  constructor(targets: Elem[]) {
+    this.targets = targets;
+  }
+
+  action(repo: RDRepository): void {
+    this.snapshots = this.targets
+      .map((target) => ({ elem: target, index: repo.elements.indexOf(target) }))
+      .filter((snapshot) => snapshot.index !== -1)
+      .sort((a, b) => a.index - b.index);
+
+    [...this.snapshots]
+      .sort((a, b) => b.index - a.index)
+      .forEach(({ elem, index }) => {
+        repo.elements.splice(index, 1);
+        if (isVector(elem)) {
+          const idx = repo.vertexList.indexOf(elem);
+          if (idx !== -1) {
+            repo.vertexList.splice(idx, 1);
+          }
+        }
+        if (isLoop(elem)) {
+          const idx = repo.loopList.indexOf(elem);
+          if (idx !== -1) {
+            repo.loopList.splice(idx, 1);
+          }
+        }
+        if (isLine(elem)) {
+          const idx = repo.lineList.indexOf(elem);
+          if (idx !== -1) {
+            repo.lineList.splice(idx, 1);
+          }
+        }
+      });
+  }
+
+  unaction(repo: RDRepository): void {
+    this.snapshots
+      .sort((a, b) => a.index - b.index)
+      .forEach(({ elem, index }) => {
+        repo.elements.splice(index, 0, elem);
+        if (isVector(elem) && !repo.vertexList.includes(elem as Vector)) {
+          repo.vertexList.push(elem as Vector);
+        }
+        if (isLoop(elem) && !repo.loopList.includes(elem as Loop)) {
+          repo.loopList.push(elem as Loop);
+        }
+        if (isLine(elem) && !repo.lineList.includes(elem as Line)) {
+          repo.lineList.push(elem as Line);
+        }
+      });
+  }
+}
+
+export class SetLoopRadius implements RepositoryCommand {
+  target: Loop;
+  before: number;
+  after: number;
+
+  constructor(target: Loop, after: number) {
+    this.target = target;
+    this.before = target.radius;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.setRadius(this.after);
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.setRadius(this.before);
+  }
+}
+
+export class SetLoopBeginAngle implements RepositoryCommand {
+  target: Loop;
+  before: number;
+  after: number;
+
+  constructor(target: Loop, after: number) {
+    this.target = target;
+    this.before = target.loopBeginAngle;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.setLoopBeginAngle(this.after);
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.setLoopBeginAngle(this.before);
+  }
+}
+
+export class SetLoopEndAngle implements RepositoryCommand {
+  target: Loop;
+  before: number;
+  after: number;
+
+  constructor(target: Loop, after: number) {
+    this.target = target;
+    this.before = target.loopEndAngle;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.setLoopEndAngle(this.after);
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.setLoopEndAngle(this.before);
+  }
+}
+
+export class SetLoopAngles implements RepositoryCommand {
+  target: Loop;
+  beforeStart: number;
+  beforeEnd: number;
+  afterStart: number;
+  afterEnd: number;
+
+  constructor(target: Loop, afterStart: number, afterEnd: number) {
+    this.target = target;
+    this.beforeStart = target.loopBeginAngle;
+    this.beforeEnd = target.loopEndAngle;
+    this.afterStart = afterStart;
+    this.afterEnd = afterEnd;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.setLoopBeginAngle(this.afterStart);
+    this.target.setLoopEndAngle(this.afterEnd);
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.setLoopBeginAngle(this.beforeStart);
+    this.target.setLoopEndAngle(this.beforeEnd);
+  }
+}
+
+export class SetLineEndpoint implements RepositoryCommand {
+  line: Line;
+  endpoint: "origin" | "to";
+  before: Vector;
+  after: Vector;
+
+  constructor(line: Line, endpoint: "origin" | "to", after: Vector) {
+    this.line = line;
+    this.endpoint = endpoint;
+    this.before = line[endpoint].copy();
+    this.after = after.copy();
+  }
+
+  action(repo: RDRepository): void {
+    this.line[this.endpoint].moveAbsolute(this.after);
+  }
+
+  unaction(repo: RDRepository): void {
+    this.line[this.endpoint].moveAbsolute(this.before);
+  }
+}
+
+export class SetLineControlPoint implements RepositoryCommand {
+  line: Line;
+  before: Vector | null;
+  after: Vector | null;
+
+  constructor(line: Line, after: Vector | null) {
+    this.line = line;
+    this.before = line.control ? line.control.copy() : null;
+    this.after = after ? after.copy() : null;
+  }
+
+  action(repo: RDRepository): void {
+    this.line.control = this.after ? this.after.copy() : null;
+  }
+
+  unaction(repo: RDRepository): void {
+    this.line.control = this.before ? this.before.copy() : null;
   }
 }

@@ -22,6 +22,8 @@ export class Line implements Elem {
   allow: Boolean = true;
   origin: Vector = new Vector(0, 0);
   to: Vector = new Vector(0, 0);
+  control: Vector | null = null;
+  arrowRotation: number = 0;
 
   save(): any {
     let saveData = {} as any
@@ -31,6 +33,8 @@ export class Line implements Elem {
     saveData["allow"] = this.allow;
     saveData["origin"] = this.origin.save();
     saveData["to"] = this.to.save();
+    saveData["control"] = this.control ? this.control.save() : null;
+    saveData["arrowRotation"] = this.arrowRotation;
     return saveData
   }
 
@@ -40,8 +44,10 @@ export class Line implements Elem {
     line.style = this.style;
     line.labelDiff = line.labelDiff;
     line.allow = this.allow;
-    line.origin = this.origin;
-    line.to = this.to;
+    line.origin = this.origin.copy();
+    line.to = this.to.copy();
+    line.control = this.control ? this.control.copy() : null;
+    line.arrowRotation = this.arrowRotation;
     return line;
   }
 
@@ -110,21 +116,15 @@ export class Line implements Elem {
   }
 
   center(): Vector {
+    if (this.control) {
+      return this.pointAt(0.5);
+    }
     return this.origin.add(this.to).multi(1 / 2);
   }
 
   formalDistance(point: Vector): number {
-    const vec1 = point.minus(this.origin);
-    const vec2 = point.minus(this.to);
-    // const cosTheta = vec1.prod(vec2)
-    if (Math.abs(vec1.length() + vec2.length() - this.length()) > 10) {
-      return Infinity;
-    }
-    let perp_unit = this.directionUnit().rotation(Math.PI / 2);
-    let diff = point.minus(this.origin);
-    const perpLength = Math.abs(diff.prod(perp_unit));
-
-    return perpLength;
+    const closest = this.closestPoint(point);
+    return point.minus(closest).length();
 
     // let toLength = this.to.minus(point).length()
     // let originLength = this.origin.minus(point).length()
@@ -147,6 +147,64 @@ export class Line implements Elem {
   description(): string {
     return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) -> (${this.to.x}, ${this.to.y}) stayle:${this.style}`;
   }
+
+  closestPoint(point: Vector): Vector {
+    if (!this.control) {
+      const direction = this.direction();
+      const lengthSquared = direction.prod(direction);
+      if (lengthSquared === 0) {
+        return this.origin.copy();
+      }
+      const t = Math.max(
+        0,
+        Math.min(
+          1,
+          point
+            .minus(this.origin)
+            .prod(direction) / lengthSquared
+        )
+      );
+      return new Vector(
+        this.origin.x + direction.x * t,
+        this.origin.y + direction.y * t
+      );
+    }
+    let closest = this.origin.copy();
+    let minDistance = Number.POSITIVE_INFINITY;
+    const segments = 64;
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const sample = this.pointAt(t);
+      const distance = point.minus(sample).length();
+      if (distance < minDistance) {
+        minDistance = distance;
+        closest = sample;
+      }
+    }
+    return closest;
+  }
+
+  pointAt(t: number): Vector {
+    t = Math.max(0, Math.min(1, t));
+    if (this.control) {
+      const oneMinusT = 1 - t;
+      const term1 = this.origin.multi(oneMinusT * oneMinusT);
+      const term2 = this.control.multi(2 * oneMinusT * t);
+      const term3 = this.to.multi(t * t);
+      return term1.add(term2).add(term3);
+    }
+    return this.origin.add(this.direction().multi(t));
+  }
+
+  tangentAt(t: number): Vector {
+    t = Math.max(0, Math.min(1, t));
+    if (this.control) {
+      const term1 = this.control.minus(this.origin).multi(2 * (1 - t));
+      const term2 = this.to.minus(this.control).multi(2 * t);
+      return term1.add(term2);
+    }
+    return this.direction();
+  }
 }
 
 export function isLine(elem: Elem): elem is Line {
@@ -164,8 +222,12 @@ export function makeLine(data: any): Line | undefined {
   elm.style = data["style"];
   elm.allow = data["allow"];
   elm.labelDiff = data["labelDiff"];
-  elm.origin = makeVector(data["origin"]) ?? new Vector(0, 0)
+  elm.origin = makeVector(data["origin"]) ?? new Vector(0, 0);
   elm.to = makeVector(data["to"]) ?? new Vector(0, 0);
+  const control = makeVector(data["control"]);
+  elm.control = control ?? null;
+  const arrowRotation = data["arrowRotation"];
+  elm.arrowRotation = typeof arrowRotation === "number" ? arrowRotation : 0;
 
   return elm;
 }

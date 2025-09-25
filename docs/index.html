@@ -47,6 +47,13 @@
         padding: 10px;
     }
 
+    div.loop p {
+        display: inline-block;
+        border-left: solid 5px mediumpurple;
+        border-bottom: solid 1px gray;
+        padding: 10px;
+    }
+
     div.canvas_box {
         display: block;
         border-left: solid 5px black;
@@ -73,6 +80,130 @@
         border-bottom: solid 1px gray;
         border-top: solid 1px gray;
         padding: 0px 6px 0px 6px;
+    }
+
+    .tool-sidebar {
+        width: 13rem;
+        pointer-events: auto;
+        top: 5rem;
+        bottom: 1rem;
+        overflow-y: auto;
+        z-index: 1030;
+    }
+
+    .tool-panel {
+        border-radius: 1rem;
+    }
+
+    .tool-panel .btn {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 0.5rem;
+        text-align: left;
+    }
+
+    .tool-panel .btn .tool-label {
+        flex: 1 1 auto;
+    }
+
+    .tool-panel .btn i {
+        font-size: 1.1rem;
+    }
+
+    .tool-panel .btn.active {
+        background-color: var(--bs-primary-bg-subtle);
+        border-color: var(--bs-primary-border-subtle);
+        color: var(--bs-primary-text);
+    }
+
+    .tool-mode-indicator {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+    }
+
+    .tool-section-title {
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--bs-secondary-color);
+        padding: 0.25rem 0.5rem;
+    }
+
+    #canvas-context-menu {
+        position: fixed;
+        z-index: 1080;
+        min-width: 12rem;
+        display: none;
+        visibility: hidden;
+    }
+
+    #canvas-context-menu .context-menu-item {
+        background: transparent;
+        border: 0;
+        width: 100%;
+        text-align: left;
+        padding: 0.5rem 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    #canvas-context-menu .context-menu-item:hover {
+        background-color: var(--bs-secondary-bg);
+    }
+
+    #canvas-context-menu .context-menu-item i {
+        font-size: 1rem;
+    }
+
+    #canvas-context-menu hr {
+        margin: 0.25rem 0.5rem;
+    }
+
+    .loop-controls {
+        border-top: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.1));
+        padding-top: 0.75rem;
+        margin-top: 0.75rem;
+    }
+
+    .loop-controls .form-label {
+        font-size: 0.75rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .loop-controls .value-badge {
+        font-variant-numeric: tabular-nums;
+        font-weight: 600;
+    }
+
+    .loop-controls .loop-control-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .loop-controls .loop-control-row .form-range {
+        flex: 1 1 auto;
+    }
+
+    .loop-controls .form-range {
+        height: 0.75rem;
+    }
+
+    .loop-controls .btn-group-sm .btn {
+        padding: 0.1rem 0.35rem;
+        font-size: 0.7rem;
+    }
+
+    .loop-controls .loop-metrics {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.5rem;
+        margin-top: 0.25rem;
     }
 </style>
 
@@ -127,13 +258,149 @@
         </div>
     </div>
 
-    <!-- Mode -->
-    <div class="position-fixed start-0" style = "width: 8rem; top: 4rem;">
-        <div id="mode" class="border rounded-pill bg-body-tertiary shadow-sm text-center m-2 p-2">mode</div>
+    <!-- Command Panel -->
+    <div class="tool-sidebar position-fixed start-0 ps-3">
+        <div class="tool-panel border bg-body-tertiary shadow-sm p-2">
+            <div class="tool-section-title">Tools</div>
+            <div id="mode" class="tool-mode-indicator rounded-pill bg-body-secondary text-center fw-semibold mb-3 px-3 py-1">Select</div>
+            <div class="btn-group-vertical w-100" role="group" aria-label="Drawing modes">
+                <button type="button" class="btn btn-outline-secondary" data-command="mode-normal" data-mode="normal" title="Select and edit elements">
+                    <i class="bi bi-cursor"></i><span class="tool-label">Select</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="mode-line" data-mode="line" title="Draw propagators">
+                    <i class="bi bi-bezier"></i><span class="tool-label">Line</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="mode-loop" data-mode="loop" title="Draw loops">
+                    <i class="bi bi-circle"></i><span class="tool-label">Loop</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="mode-point" data-mode="point" title="Place vertices with clicks">
+                    <i class="bi bi-record-fill"></i><span class="tool-label">Point</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="mode-string" data-mode="string" title="Insert text labels with clicks">
+                    <i class="bi bi-type"></i><span class="tool-label">Text</span>
+                </button>
+            </div>
+            <div class="tool-section-title mt-3">Quick Add (last cursor)</div>
+            <div class="btn-group-vertical w-100" role="group" aria-label="Create elements">
+                <button type="button" class="btn btn-outline-secondary" data-command="add-vertex" title="Add a vertex at the last cursor position">
+                    <i class="bi bi-plus-circle"></i><span class="tool-label">Add Vertex</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="add-loop" title="Add a loop at the last cursor position">
+                    <i class="bi bi-bounding-box-circles"></i><span class="tool-label">Add Loop</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="add-text" title="Insert a text label at the last cursor position">
+                    <i class="bi bi-card-text"></i><span class="tool-label">Add Text</span>
+                </button>
+            </div>
+            <div class="tool-section-title mt-3">Selection actions</div>
+            <div class="btn-group-vertical w-100" role="group" aria-label="Edit selection">
+                <button type="button" class="btn btn-outline-secondary" data-command="fill" title="Fill the selected loop">
+                    <i class="bi bi-paint-bucket"></i><span class="tool-label">Fill Loop</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="toggle-arrow" title="Toggle arrow direction on the selected propagator">
+                    <i class="bi bi-arrow-repeat"></i><span class="tool-label">Toggle Arrow</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="change-type" title="Cycle the propagator type">
+                    <i class="bi bi-shuffle"></i><span class="tool-label">Change Type</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="change-style" title="Cycle the propagator style">
+                    <i class="bi bi-bezier2"></i><span class="tool-label">Change Style</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="arrow-rotate-left" title="Rotate arrow counter-clockwise">
+                    <i class="bi bi-arrow-counterclockwise"></i><span class="tool-label">Arrow ↺</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="arrow-rotate-right" title="Rotate arrow clockwise">
+                    <i class="bi bi-arrow-clockwise"></i><span class="tool-label">Arrow ↻</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="arrow-reset" title="Reset arrow rotation">
+                    <i class="bi bi-arrow-return-left"></i><span class="tool-label">Arrow Reset</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="rotation" title="Rotate clockwise">
+                    <i class="bi bi-arrow-clockwise"></i><span class="tool-label">Rotate CW</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="anti-rotation" title="Rotate counterclockwise">
+                    <i class="bi bi-arrow-counterclockwise"></i><span class="tool-label">Rotate CCW</span>
+                </button>
+                <button type="button" class="btn btn-outline-danger" data-command="delete" title="Delete the selected element">
+                    <i class="bi bi-trash"></i><span class="tool-label">Delete</span>
+                </button>
+            </div>
+            <div id="loop-controls" class="loop-controls d-none">
+                <div class="tool-section-title mb-2">Loop controls</div>
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    <span>Radius</span>
+                    <span id="loop-radius-value" class="value-badge">--</span>
+                </label>
+                <div class="loop-control-row">
+                    <input type="range" class="form-range" id="loop-radius" min="1" max="80" step="0.5" value="1">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" data-loop-step="radius" data-step="-1" title="Shrink loop">-</button>
+                        <button type="button" class="btn btn-outline-secondary" data-loop-step="radius" data-step="1" title="Grow loop">+</button>
+                    </div>
+                </div>
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    <span>Gap start</span>
+                    <span id="loop-start-value" class="value-badge">--°</span>
+                </label>
+                <div class="loop-control-row">
+                    <input type="range" class="form-range" id="loop-gap-start" min="0" max="360" step="1" value="0">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" data-loop-step="start" data-step="-5" title="Start -5°">-5°</button>
+                        <button type="button" class="btn btn-outline-secondary" data-loop-step="start" data-step="5" title="Start +5°">+5°</button>
+                    </div>
+                </div>
+                <label class="form-label d-flex justify-content-between align-items-center">
+                    <span>Gap end</span>
+                    <span id="loop-end-value" class="value-badge">--°</span>
+                </label>
+                <div class="loop-control-row">
+                    <input type="range" class="form-range" id="loop-gap-end" min="0" max="360" step="1" value="360">
+                    <div class="btn-group btn-group-sm" role="group">
+                        <button type="button" class="btn btn-outline-secondary" data-loop-step="end" data-step="-5" title="End -5°">-5°</button>
+                        <button type="button" class="btn btn-outline-secondary" data-loop-step="end" data-step="5" title="End +5°">+5°</button>
+                    </div>
+                </div>
+                <div class="loop-metrics small text-secondary">
+                    <span>Arc <span id="loop-arc-value">--°</span></span>
+                    <span>Gap <span id="loop-gap-value">--°</span></span>
+                </div>
+                <div class="btn-group btn-group-sm w-100 mt-2" role="group">
+                    <button type="button" class="btn btn-outline-secondary" data-loop-action="full">Full loop</button>
+                    <button type="button" class="btn btn-outline-secondary" data-loop-action="gap60">Open 60° gap</button>
+                    <button type="button" class="btn btn-outline-secondary" data-loop-action="gap180">Half arc</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvas-context-menu" class="bg-body-tertiary border shadow-sm rounded p-1">
+        <button type="button" class="context-menu-item" data-command="select-here">
+            <i class="bi bi-cursor"></i><span>Select here</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="sub-select-here">
+            <i class="bi bi-crosshair"></i><span>Set sub-selection</span>
+        </button>
+        <hr>
+        <button type="button" class="context-menu-item" data-command="add-vertex">
+            <i class="bi bi-plus-circle"></i><span>Add vertex</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="add-loop">
+            <i class="bi bi-bounding-box-circles"></i><span>Add loop</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="add-line-from-pointer">
+            <i class="bi bi-arrow-right"></i><span>Propagator start/finish</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="add-text">
+            <i class="bi bi-card-text"></i><span>Add text</span>
+        </button>
+        <hr>
+        <button type="button" class="context-menu-item text-danger" data-command="delete">
+            <i class="bi bi-trash"></i><span>Delete selection</span>
+        </button>
     </div>
 
     <!-- Detail of Selected Element -->
-    <div class="position-fixed bottom-0 start-0" style = "width: 25rem;">
+    <div class="position-fixed bottom-0 start-0" style = "width: 25rem; left: 15rem; bottom: 1rem; z-index: 1020;">
         <div class="border bg-body-tertiary shadow-sm m-2 p-1">
             <div id="current" class="text-danger m-1">-</div>
             <hr class="border m-1">
@@ -160,45 +427,35 @@
 
                 <div class="modal-body">
                     <div class="add">
-                        <p>Mode Change [m]</p>
-                        <p>Add Point [v]</p>
-                        <p>Add Loop [l]</p>
-                        <p>Draw Propagator [p]</p>
-                        <p>Draw Propagator2 [-]</p>
+                        <p>Select a tool from the left panel before drawing.</p>
+                        <p>Propagator tool: click once to pick a start point, click again to finish the line. Press Esc to cancel.</p>
+                        <p>Vertex tool: click anywhere to add a vertex.</p>
+                        <p>Loop tool: click to place a loop or attach one to the current selection.</p>
+                        <p>Text tool: click to place a label.</p>
                     </div>
                     <div class="select">
-                        <p>(Red) Select [click]</p>
-                        <p>Sub (green) select [double click]</p>
-                        <p>Select reverse [c]</p>
-                        <p>Next select [n]</p>
-                        <p>Back select [b]</p>
-                        <p>Next sub select [s]</p>
-                        <p>Back sub select [a]</p>
+                        <p>Select tool: click to select, Shift+click to set the sub selection.</p>
+                        <p>Right-click anywhere to open the context menu for quick add, delete, or propagator actions.</p>
+                        <p>Drag on the canvas to draw a selection box; hold Shift to add to the current selection.</p>
+                        <p>Drag a selected element to move the whole selection; Delete removes everything selected.</p>
+                        <p>Hold Alt while dragging to start a marquee even when the pointer is above existing geometry.</p>
                     </div>
                     <div class="linestyle">
-                        <p>Allow direction change [t]</p>
-                        <p>Line style change [q]</p>
-                        <p>Remove arrow [@]</p>
-                        <p>fill loop [f] </p>
-                        <p>Scale up [w]</p>
-                        <p>Scale down [x]</p>
-                        <p>Arc angle change [W,X,E,C]</p>
-                        <p>rotation [r, R]</p>
+                        <p>The Selection actions buttons toggle arrows, cycle styles, rotate arrow heads, and fill loops.</p>
+                        <p>Keep clicking with the propagator tool to chain multiple segments.</p>
+                    </div>
+                    <div class="loop">
+                        <p>Use the Loop controls sliders to resize a loop or adjust the missing segment.</p>
+                        <p>The preset buttons quickly restore a full loop or open common gaps.</p>
                     </div>
                     <div class="move">
-                        <p>Up select target [8]</p>
-                        <p>Right select target [6]</p>
-                        <p>Left select target [4]</p>
-                        <p>Down select target [2]</p>
+                        <p>Use the arrow keys to nudge the selection by one grid unit.</p>
+                        <p>Press Delete or Backspace to remove the current selection.</p>
                     </div>
                     <div class="mode">
-                        <p>No select mode In/Out [z]</p>
-                        <p>String Input [/]</p>
-                        <p>copy [ctr + c]</p>
-                        <p>Export tikz text [e]</p>
-                        <p>Export svg text [ctr + e]</p>
-                        <p>Undo [<]</p>
-                        <p>Redo [>]</p>
+                        <p>Ctrl / ⌘ + Z for undo, Ctrl / ⌘ + Shift + Z or Ctrl / ⌘ + Y for redo.</p>
+                        <p>Ctrl / ⌘ + C copies the selection, Ctrl / ⌘ + E exports SVG text, Ctrl / ⌘ + P exports TikZ.</p>
+                        <p>Press Esc to cancel a propagator draft and return to the Select tool.</p>
                     </div>
                 </div>
 
