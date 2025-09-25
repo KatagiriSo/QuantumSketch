@@ -486,7 +486,7 @@ export class DrawContext {
       this.addExport("\\end{tikzpicture}\n ");
       this.addExport("}\n ");
 
-      let selector = document.querySelector("div#output") as HTMLElement;
+      let selector = document.querySelector("div#output-tikz") as HTMLElement;
       selector.textContent = this.exportString;
 
       const ret = this.exportString;
@@ -497,7 +497,7 @@ export class DrawContext {
     if (this.exportType == "svg") {
       this.addExport(`</svg>`);
 
-      let selector = document.querySelector("div#output") as HTMLElement;
+      let selector = document.querySelector("div#output-svg") as HTMLElement;
       selector.textContent = this.exportString;
       this.fildDownload(this.exportString);
 
@@ -532,7 +532,6 @@ export class DrawContext {
       const dateStr = new Date().toISOString();
       const fileName = `${dateStr}.svg`;
       link.download = fileName;
-      link.innerText = fileName;
       link.hidden = false;
     }
   }

@@ -86,6 +86,31 @@ export class RDDraw {
     document.addEventListener("keypress", (ev) => {
       this.keyPress(ev);
     });
+
+    (document.getElementById("nav-redo"))?.addEventListener("click", (ev: Event) => {
+      ev.preventDefault();
+      this.redo();
+    });
+
+    (document.getElementById("nav-undo"))?.addEventListener("click", (ev: Event) => {
+      ev.preventDefault();
+      this.undo();
+    });
+
+    (document.getElementById("nav-export-tikz"))?.addEventListener("click", (ev: Event) => {
+      ev.preventDefault();
+      this.drawAll("tikz");
+    });
+
+    (document.getElementById("nav-export-svg"))?.addEventListener("click", (ev: Event) => {
+      ev.preventDefault();
+      this.drawAll("svg");
+    });
+
+    (document.getElementById("download"))?.addEventListener("click", (ev: Event) => {
+      this.drawAll("svg");
+    });
+
   }
 
   setPrevXY(eventX: number, eventY: number) {
