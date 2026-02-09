@@ -3,6 +3,8 @@ import { Line, isLine, LineStyle } from "../Core/Line";
 import { Loop, isLoop } from "../Core/Loop";
 import { MyString } from "../Core/MyString";
 import { Vector, isVector } from "../Core/Vector";
+import { Vertex } from "../Core/Vertex";
+import { Group, isGroup } from "../Core/Group";
 import { RDRepository } from "./RDRepository";
 
 /**
@@ -16,12 +18,52 @@ export interface RepositoryCommand {
   unaction(repo: RDRepository): void;
 }
 
+function moveTargetTo(target: Elem, point: Vector): void {
+  if (isLine(target)) {
+    target.moveAbsolute(point);
+    return;
+  }
+  if (isLoop(target)) {
+    target.moveAbsolute(point);
+    return;
+  }
+  if (isVector(target)) {
+    target.moveAbsolute(point);
+    return;
+  }
+  if (target instanceof MyString) {
+    target.origin.moveAbsolute(point);
+  }
+}
+
+function anchorPoint(target: Elem): Vector {
+  if (isLine(target)) {
+    return target.center();
+  }
+  if (isLoop(target)) {
+    return target.origin.copy();
+  }
+  if (isVector(target)) {
+    return target.copy();
+  }
+  if (target instanceof MyString) {
+    return target.origin.copy();
+  }
+  return new Vector(0, 0);
+}
+
 export class SetVertex implements RepositoryCommand {
-  vertex: Vector;
-  copyVertex: Vector;
+  vertex: Vertex;
+  copyVertex: Vertex;
   constructor(vertex: Vector) {
-    this.vertex = vertex;
-    this.copyVertex = vertex.copy();
+    if (vertex instanceof Vertex) {
+      this.vertex = vertex;
+      this.copyVertex = vertex.copy();
+      return;
+    }
+    this.vertex = new Vertex(vertex.x, vertex.y);
+    this.vertex.id = vertex.id;
+    this.copyVertex = this.vertex.copy();
   }
   action(repo: RDRepository): void {
     repo.vertexList.push(this.copyVertex);
@@ -95,34 +137,55 @@ export class SetLoop implements RepositoryCommand {
 
 export class Delete implements RepositoryCommand {
   target: Elem;
+  private index: number = -1;
 
   constructor(target: Elem) {
     this.target = target;
   }
 
   action(repo: RDRepository): void {
-    repo.elements.splice(repo.elements.indexOf(this.target), 1);
+    this.index = repo.elements.indexOf(this.target);
+    if (this.index === -1) {
+      return;
+    }
+    repo.elements.splice(this.index, 1);
     if (isVector(this.target)) {
-      repo.vertexList.splice(repo.vertexList.indexOf(this.target), 1);
+      const idx = repo.vertexList.indexOf(this.target as Vertex);
+      if (idx !== -1) {
+        repo.vertexList.splice(idx, 1);
+      }
     }
     if (isLoop(this.target)) {
-      repo.loopList.splice(repo.loopList.indexOf(this.target), 1);
+      const idx = repo.loopList.indexOf(this.target);
+      if (idx !== -1) {
+        repo.loopList.splice(idx, 1);
+      }
     }
     if (isLine(this.target)) {
-      repo.lineList.splice(repo.lineList.indexOf(this.target), 1);
+      const idx = repo.lineList.indexOf(this.target);
+      if (idx !== -1) {
+        repo.lineList.splice(idx, 1);
+      }
     }
   }
 
   unaction(repo: RDRepository): void {
-    repo.elements.push(this.target);
+    const insertIndex = this.index >= 0 ? Math.min(this.index, repo.elements.length) : repo.elements.length;
+    repo.elements.splice(insertIndex, 0, this.target);
     if (isVector(this.target)) {
-      repo.vertexList.push(this.target);
+      if (!repo.vertexList.includes(this.target as Vertex)) {
+        repo.vertexList.push(this.target as Vertex);
+      }
     }
     if (isLoop(this.target)) {
-      repo.loopList.push(this.target);
+      if (!repo.loopList.includes(this.target)) {
+        repo.loopList.push(this.target);
+      }
     }
     if (isLine(this.target)) {
-      repo.lineList.push(this.target);
+      if (!repo.lineList.includes(this.target)) {
+        repo.lineList.push(this.target);
+      }
     }
   }
 }
@@ -130,13 +193,10 @@ export class Delete implements RepositoryCommand {
 export class Move implements RepositoryCommand {
   target: Elem;
   delta: Vector;
-  before: Elem;
 
   constructor(target: Elem, delta: Vector) {
     this.target = target;
     this.delta = delta;
-    this.before = JSON.parse(JSON.stringify(target));  // 深いコピー
-    Object.defineProperties(this.before, Object.getOwnPropertyDescriptors(target));
   }
 
   action(repo: RDRepository): void {
@@ -144,42 +204,37 @@ export class Move implements RepositoryCommand {
   }
 
   unaction(repo: RDRepository): void {
-    // this.target.move(this.delta.multi(-1.0));  // 誤差が蓄積する恐れ
-    Object.assign(this.target, this.before);
+    this.target.move(this.delta.multi(-1));
   }
 }
 
 export class MoveAbsolute implements RepositoryCommand {
   target: Elem;
   location: Vector;
-  before: Elem;
+  before: Vector;
 
   constructor(target: Elem, location: Vector) {
     this.target = target;
     this.location = location;
-    this.before = JSON.parse(JSON.stringify(target));  // 深いコピー
-    Object.defineProperties(this.before, Object.getOwnPropertyDescriptors(target));
+    this.before = anchorPoint(target);
   }
 
   action(repo: RDRepository): void {
-    this.target.moveAbsolute(this.location);
+    moveTargetTo(this.target, this.location);
   }
 
   unaction(repo: RDRepository): void {
-    Object.assign(this.target, this.before);
+    moveTargetTo(this.target, this.before);
   }
 }
 
 export class Rotation implements RepositoryCommand {
   target: Line | Loop;
   delta: number;
-  before: Line | Loop;
 
   constructor(target: Line | Loop, delta: number) {
     this.target = target;
     this.delta = delta;
-    this.before = JSON.parse(JSON.stringify(target));  // 深いコピー
-    Object.defineProperties(this.before, Object.getOwnPropertyDescriptors(target));
   }
 
   action(repo: RDRepository): void {
@@ -187,21 +242,17 @@ export class Rotation implements RepositoryCommand {
   }
 
   unaction(repo: RDRepository): void {
-    // this.target.rotation(-this.delta);
-    Object.assign(this.target, this.before);
+    this.target.rotation(-this.delta);
   }
 }
 
 export class ChangeScale implements RepositoryCommand {
   target: Line | Loop;
   delta: number;
-  before: Line | Loop;
 
   constructor(target: Line | Loop, delta: number) {
     this.target = target;
     this.delta = delta;
-    this.before = JSON.parse(JSON.stringify(target));  // 深いコピー
-    Object.defineProperties(this.before, Object.getOwnPropertyDescriptors(target));
   }
 
   action(repo: RDRepository): void {
@@ -214,13 +265,12 @@ export class ChangeScale implements RepositoryCommand {
   }
 
   unaction(repo: RDRepository): void {
-    // if (isLine(this.target)) {
-    //   this.target.to = this.target.to.minus(this.target.directionUnit().multi(this.delta));
-    // }
-    // if (isLoop(this.target)) {
-    //   this.target.setRadius(this.target.radius - this.delta * 1);
-    // }
-    Object.assign(this.target, this.before);
+    if (isLine(this.target)) {
+      this.target.to = this.target.to.add(this.target.directionUnit().multi(-this.delta));
+    }
+    if (isLoop(this.target)) {
+      this.target.setRadius(this.target.radius - this.delta * 1);
+    }
   }
 }
 
@@ -427,16 +477,10 @@ export class ChangeStyle implements RepositoryCommand {
 export class MoveGroup implements RepositoryCommand {
   targets: Elem[];
   delta: Vector;
-  before: Elem[] = [];
 
   constructor(targets: Elem[], delta: Vector) {
     this.targets = targets;
     this.delta = delta;
-    this.before = targets.map((target) => {
-      const cloned = JSON.parse(JSON.stringify(target));
-      Object.defineProperties(cloned, Object.getOwnPropertyDescriptors(target));
-      return cloned;
-    });
   }
 
   action(repo: RDRepository): void {
@@ -446,8 +490,8 @@ export class MoveGroup implements RepositoryCommand {
   }
 
   unaction(repo: RDRepository): void {
-    this.targets.forEach((target, index) => {
-      Object.assign(target, this.before[index]);
+    this.targets.forEach((target) => {
+      target.move(this.delta.multi(-1));
     });
   }
 }
@@ -471,7 +515,7 @@ export class DeleteGroup implements RepositoryCommand {
       .forEach(({ elem, index }) => {
         repo.elements.splice(index, 1);
         if (isVector(elem)) {
-          const idx = repo.vertexList.indexOf(elem);
+          const idx = repo.vertexList.indexOf(elem as Vertex);
           if (idx !== -1) {
             repo.vertexList.splice(idx, 1);
           }
@@ -496,8 +540,8 @@ export class DeleteGroup implements RepositoryCommand {
       .sort((a, b) => a.index - b.index)
       .forEach(({ elem, index }) => {
         repo.elements.splice(index, 0, elem);
-        if (isVector(elem) && !repo.vertexList.includes(elem as Vector)) {
-          repo.vertexList.push(elem as Vector);
+        if (isVector(elem) && !repo.vertexList.includes(elem as Vertex)) {
+          repo.vertexList.push(elem as Vertex);
         }
         if (isLoop(elem) && !repo.loopList.includes(elem as Loop)) {
           repo.loopList.push(elem as Loop);
@@ -506,6 +550,151 @@ export class DeleteGroup implements RepositoryCommand {
           repo.lineList.push(elem as Line);
         }
       });
+  }
+}
+
+export class GroupSelection implements RepositoryCommand {
+  targets: Elem[];
+  group?: Group;
+  snapshots: { elem: Elem; index: number }[] = [];
+
+  constructor(targets: Elem[]) {
+    this.targets = targets;
+  }
+
+  action(repo: RDRepository): void {
+    this.snapshots = this.targets
+      .map((target) => ({ elem: target, index: repo.elements.indexOf(target) }))
+      .filter((snapshot) => snapshot.index !== -1)
+      .sort((a, b) => a.index - b.index);
+
+    if (this.snapshots.length < 2) {
+      return;
+    }
+
+    const groupedElements = this.snapshots.map((snapshot) => snapshot.elem);
+    this.group = this.group ?? new Group(groupedElements);
+    this.group.elements = groupedElements;
+
+    [...this.snapshots]
+      .sort((a, b) => b.index - a.index)
+      .forEach(({ elem, index }) => {
+        repo.elements.splice(index, 1);
+        if (isVector(elem)) {
+          const idx = repo.vertexList.indexOf(elem as Vertex);
+          if (idx !== -1) {
+            repo.vertexList.splice(idx, 1);
+          }
+        }
+        if (isLoop(elem)) {
+          const idx = repo.loopList.indexOf(elem);
+          if (idx !== -1) {
+            repo.loopList.splice(idx, 1);
+          }
+        }
+        if (isLine(elem)) {
+          const idx = repo.lineList.indexOf(elem);
+          if (idx !== -1) {
+            repo.lineList.splice(idx, 1);
+          }
+        }
+      });
+
+    repo.elements.splice(this.snapshots[0].index, 0, this.group);
+    repo.setSelection([this.group]);
+  }
+
+  unaction(repo: RDRepository): void {
+    if (!this.group) {
+      return;
+    }
+    const groupIndex = repo.elements.indexOf(this.group);
+    if (groupIndex !== -1) {
+      repo.elements.splice(groupIndex, 1);
+    }
+
+    this.snapshots
+      .sort((a, b) => a.index - b.index)
+      .forEach(({ elem, index }) => {
+        const insertIndex = Math.min(index, repo.elements.length);
+        repo.elements.splice(insertIndex, 0, elem);
+        if (isVector(elem) && !repo.vertexList.includes(elem as Vertex)) {
+          repo.vertexList.push(elem as Vertex);
+        }
+        if (isLoop(elem) && !repo.loopList.includes(elem)) {
+          repo.loopList.push(elem);
+        }
+        if (isLine(elem) && !repo.lineList.includes(elem)) {
+          repo.lineList.push(elem);
+        }
+      });
+    repo.setSelection(this.snapshots.map((snapshot) => snapshot.elem));
+  }
+}
+
+export class UngroupSelection implements RepositoryCommand {
+  group: Group;
+  index: number = -1;
+  elements: Elem[] = [];
+
+  constructor(group: Group) {
+    this.group = group;
+    this.elements = [...group.elements];
+  }
+
+  action(repo: RDRepository): void {
+    this.index = repo.elements.indexOf(this.group);
+    if (this.index === -1) {
+      return;
+    }
+    repo.elements.splice(this.index, 1, ...this.elements);
+    this.elements.forEach((elem) => {
+      if (isGroup(elem)) {
+        return;
+      }
+      if (isVector(elem) && !repo.vertexList.includes(elem as Vertex)) {
+        repo.vertexList.push(elem as Vertex);
+      }
+      if (isLoop(elem) && !repo.loopList.includes(elem)) {
+        repo.loopList.push(elem);
+      }
+      if (isLine(elem) && !repo.lineList.includes(elem)) {
+        repo.lineList.push(elem);
+      }
+    });
+    repo.setSelection(this.elements);
+  }
+
+  unaction(repo: RDRepository): void {
+    if (this.index === -1) {
+      return;
+    }
+    const firstIndex = repo.elements.indexOf(this.elements[0]);
+    if (firstIndex === -1) {
+      return;
+    }
+    repo.elements.splice(firstIndex, this.elements.length, this.group);
+    this.elements.forEach((elem) => {
+      if (isVector(elem)) {
+        const idx = repo.vertexList.indexOf(elem as Vertex);
+        if (idx !== -1) {
+          repo.vertexList.splice(idx, 1);
+        }
+      }
+      if (isLoop(elem)) {
+        const idx = repo.loopList.indexOf(elem);
+        if (idx !== -1) {
+          repo.loopList.splice(idx, 1);
+        }
+      }
+      if (isLine(elem)) {
+        const idx = repo.lineList.indexOf(elem);
+        if (idx !== -1) {
+          repo.lineList.splice(idx, 1);
+        }
+      }
+    });
+    repo.setSelection([this.group]);
   }
 }
 
@@ -600,19 +789,37 @@ export class SetLineEndpoint implements RepositoryCommand {
   endpoint: "origin" | "to";
   before: Vector;
   after: Vector;
+  beforeVertexId?: string;
+  afterVertexId?: string;
 
   constructor(line: Line, endpoint: "origin" | "to", after: Vector) {
     this.line = line;
     this.endpoint = endpoint;
     this.before = line[endpoint].copy();
     this.after = after.copy();
+    this.beforeVertexId = endpoint === "origin" ? line.startVertexId : line.endVertexId;
+    this.afterVertexId = after.id;
   }
 
   action(repo: RDRepository): void {
+    if (this.afterVertexId) {
+      const vertex = repo.getVertex(this.afterVertexId);
+      if (vertex) {
+        repo.bindLineEndpoint(this.line, this.endpoint, vertex);
+        return;
+      }
+    }
     this.line[this.endpoint].moveAbsolute(this.after);
   }
 
   unaction(repo: RDRepository): void {
+    if (this.beforeVertexId) {
+      const vertex = repo.getVertex(this.beforeVertexId);
+      if (vertex) {
+        repo.bindLineEndpoint(this.line, this.endpoint, vertex);
+        return;
+      }
+    }
     this.line[this.endpoint].moveAbsolute(this.before);
   }
 }

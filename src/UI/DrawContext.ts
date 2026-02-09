@@ -17,9 +17,26 @@ export class DrawContext {
   private exportString: string = "";
   private coordinate: Vector = new Vector(0, 0);
   private scale: number = config.scale;
+  private viewOffset: Vector = new Vector(0, 0);
   constructor(context: CanvasRenderingContext2D) {
     this.canvasContext = context;
     this.canvasContext.font = "25px Arial";
+  }
+
+  setViewOffset(offset: Vector) {
+    this.viewOffset = new Vector(offset.x, offset.y);
+  }
+
+  getViewOffset(): Vector {
+    return new Vector(this.viewOffset.x, this.viewOffset.y);
+  }
+
+  private canvasX(x: number): number {
+    return (x + this.viewOffset.x) * this.scale;
+  }
+
+  private canvasY(y: number): number {
+    return (y + this.viewOffset.y) * this.scale;
   }
 
   /**
@@ -78,6 +95,9 @@ export class DrawContext {
     }
     if (exportType == "svg") {
       this.scale = config.scale;
+    }
+    if (exportType !== "canvas") {
+      this.viewOffset = new Vector(0, 0);
     }
   }
 
@@ -139,10 +159,10 @@ export class DrawContext {
       }
 
       this.canvasContext.moveTo(
-        this.coordinate.x * this.scale,
-        this.coordinate.y * this.scale
+        this.canvasX(this.coordinate.x),
+        this.canvasY(this.coordinate.y)
       );
-      this.canvasContext.lineTo(x * this.scale, y * this.scale);
+      this.canvasContext.lineTo(this.canvasX(x), this.canvasY(y));
       this.coordinate = new Vector(x, y);
       return;
     }
@@ -245,8 +265,8 @@ export class DrawContext {
       let y = y_;
       // loggerVer(`fillRect${x} ${y} ${w} ${h}`);
       this.canvasContext.fillRect(
-        x * this.scale,
-        y * this.scale,
+        this.canvasX(x),
+        this.canvasY(y),
         w * this.scale,
         h * this.scale
       );
@@ -290,7 +310,7 @@ export class DrawContext {
    */
   fillText(txt: string, x: number, y: number) {
     if (this.exportType == "canvas") {
-      this.canvasContext.fillText(txt, x * this.scale, y * this.scale);
+      this.canvasContext.fillText(txt, this.canvasX(x), this.canvasY(y));
       return;
     }
     if (this.exportType == "tikz") {
@@ -331,8 +351,8 @@ export class DrawContext {
         this.canvasContext.setLineDash([]);
       }
       this.canvasContext.arc(
-        x * this.scale,
-        y * this.scale,
+        this.canvasX(x),
+        this.canvasY(y),
         radius * this.scale,
         startAngle,
         endAngle

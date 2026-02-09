@@ -30,7 +30,7 @@ export class Vector implements Elem {
     saveData["id"] = this.id
     saveData["shape"] = this.shape
     saveData["x"] = this.x
-    saveData["y"] = this.x;
+    saveData["y"] = this.y;
     return saveData
   }
 
@@ -62,7 +62,10 @@ export class Vector implements Elem {
     );
   }
   copy(): Vector {
-    return new Vector(this.x, this.y);
+    const vector = new Vector(this.x, this.y);
+    vector.id = this.id;
+    vector.shape = this.shape;
+    return vector;
   }
 
   rotation(angle: number): Vector {

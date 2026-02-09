@@ -26,3 +26,11 @@ export function getElemID(): string {
   elemIDCounter++;
   return id;
 }
+
+export function setElemIDCounter(next: number): void {
+  elemIDCounter = Math.max(0, Math.floor(next));
+}
+
+export function getElemIDCounter(): number {
+  return elemIDCounter;
+}

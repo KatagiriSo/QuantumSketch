@@ -62,15 +62,21 @@
         border-top: solid 1px gray;
 
         padding: 0px;
-        margin: auto;
-        width: 640px;
-        height: 480px;
+        margin: 0;
+        width: auto;
+        height: auto;
         box-sizing: content-box;
         position: absolute;
-        top: 0;
-        right: 0;
-        bottom: 0;
-        left: 0;
+        top: 5rem;
+        right: 1rem;
+        bottom: 3.5rem;
+        left: 23.5rem;
+    }
+
+    #canvas {
+        width: 100%;
+        height: 100%;
+        display: block;
     }
 
         help {
@@ -83,12 +89,21 @@
     }
 
     .tool-sidebar {
-        width: 13rem;
+        width: 22rem;
         pointer-events: auto;
         top: 5rem;
         bottom: 1rem;
         overflow-y: auto;
         z-index: 1030;
+    }
+
+    @media (max-width: 1200px) {
+        .tool-sidebar {
+            width: 18rem;
+        }
+        div.canvas_box {
+            left: 19rem;
+        }
     }
 
     .tool-panel {
@@ -205,6 +220,17 @@
         gap: 0.5rem;
         margin-top: 0.25rem;
     }
+
+    .dsl-status {
+        min-height: 1.25rem;
+    }
+
+    .dsl-log {
+        max-height: 10rem;
+        overflow-y: auto;
+        font-variant-numeric: tabular-nums;
+        white-space: pre-wrap;
+    }
 </style>
 
 <body>
@@ -261,6 +287,160 @@
     <!-- Command Panel -->
     <div class="tool-sidebar position-fixed start-0 ps-3">
         <div class="tool-panel border bg-body-tertiary shadow-sm p-2">
+            <div class="tool-section-title">DSL Studio</div>
+            <div class="mb-2 px-1">
+                <label for="dsl-input" class="form-label small mb-1">Quick command</label>
+                <div class="input-group input-group-sm mb-2">
+                    <input
+                        id="dsl-input"
+                        type="text"
+                        class="form-control"
+                        placeholder="start 10 10; line right 8 electron"
+                        autocomplete="off"
+                        spellcheck="false"
+                    >
+                    <button id="dsl-run" type="button" class="btn btn-primary">Run</button>
+                    <button id="dsl-clear" type="button" class="btn btn-outline-secondary">Clear</button>
+                </div>
+                <label for="dsl-example-select" class="form-label small mb-1">Examples</label>
+                <div class="input-group input-group-sm mb-2">
+                    <select id="dsl-example-select" class="form-select">
+                        <option value="">Select example...</option>
+                        <option value="start 10 10; line right 8 electron">Electron segment</option>
+                        <option value="start 10 10; prop up 6 photon">Photon emission</option>
+                        <option value="start 10 10; line right 5 electron; branch; prop up 5 photon; next; line right 5 electron;">Branch + next example</option>
+                        <option value="start 20 20; loop 6">Loop at cursor</option>
+                        <option value="template qed_box">Template: QED Box</option>
+                        <option value="template qed_vertex">Template: QED Vertex correction</option>
+                        <option value="template qed_vac">Template: QED Vacuum polarization</option>
+                        <option value="template penguin">Template: Penguin</option>
+                        <option value="template compton">Template: Compton scattering</option>
+                        <option value="template s_channel">Template: s-channel scattering</option>
+                        <option value="template triangle">Template: Triangle anomaly-like loop</option>
+                        <option value="template t_channel">Template: t-channel scattering</option>
+                        <option value="template w_exchange">Template: W exchange</option>
+                        <option value="template bhabha_t">Template: Bhabha t-channel</option>
+                        <option value="template sunset">Template: Sunset self-energy</option>
+                        <option value="template double_box">Template: Double box</option>
+                        <option value="qed_se 10 15 40">QED: electron self energy macro</option>
+                        <option value="qed_vp 10 15 40">QED: vacuum polarization macro</option>
+                    </select>
+                    <button id="dsl-insert-example" type="button" class="btn btn-outline-secondary">Insert</button>
+                </div>
+                <label class="form-label small mb-1">Macro builder (paper-ready presets)</label>
+                <div class="row g-1 mb-2">
+                    <div class="col-6">
+                        <select id="dsl-macro-kind" class="form-select form-select-sm">
+                            <option value="qed_se">QED Self Energy</option>
+                            <option value="qed_vp">QED Vacuum Polarization</option>
+                        </select>
+                    </div>
+                    <div class="col-2">
+                        <input id="dsl-macro-x" type="number" class="form-control form-control-sm" value="10" aria-label="x">
+                    </div>
+                    <div class="col-2">
+                        <input id="dsl-macro-y" type="number" class="form-control form-control-sm" value="15" aria-label="y">
+                    </div>
+                    <div class="col-2">
+                        <input id="dsl-macro-length" type="number" class="form-control form-control-sm" value="40" aria-label="length">
+                    </div>
+                    <div class="col-12">
+                        <button id="dsl-build-macro" type="button" class="btn btn-outline-secondary btn-sm w-100">Build Macro Command</button>
+                    </div>
+                </div>
+                <label for="dsl-script" class="form-label small mb-1">Script editor (one command per line)</label>
+                <textarea id="dsl-script" class="form-control form-control-sm mb-1" rows="6" placeholder="# Relative DSL example&#10;start 10 10&#10;line right 5 electron&#10;branch&#10;prop up 5 photon&#10;next&#10;line right 5 electron"></textarea>
+                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Script actions">
+                    <button id="dsl-run-script" type="button" class="btn btn-success">Run Script</button>
+                    <button id="dsl-copy-script" type="button" class="btn btn-outline-secondary">Copy</button>
+                </div>
+                <div id="dsl-status" class="dsl-status small text-secondary mb-2"></div>
+                <div id="dsl-log" class="dsl-log small border rounded bg-body-tertiary p-2 mb-2">Execution log is empty.</div>
+                <details class="small mb-1">
+                    <summary>DSL command reference</summary>
+                    <div class="mt-1">
+                        <div><code>start x y</code> / <code>move x y</code> Set cursor position.</div>
+                        <div><code>line direction length [particle|style]</code> Relative edge draw from cursor; cursor moves to end.</div>
+                        <div><code>line x1 y1 x2 y2 [particle|style]</code> Absolute edge draw (for macro editing and precision fixes).</div>
+                        <div><code>prop direction length [particle|style]</code> Alias of <code>line</code>.</div>
+                        <div><code>loop radius</code> Draw a loop centered at current cursor vertex.</div>
+                        <div><code>loop x y radius [style] [beginAngle] [endAngle]</code> Absolute loop draw for editable macros.</div>
+                        <div><code>branch</code> Save current cursor as branch anchor.</div>
+                        <div><code>next</code> Return cursor to last branch anchor.</div>
+                        <div><code>join [tolerance] [force|soft]</code> Snap cursor vertex to nearby vertex and merge graph nodes.</div>
+                        <div><code>join_mode on|off</code> (or <code>join_cleanup on|off</code>) Toggle forced orphan-vertex cleanup after join.</div>
+                        <div><code>template qed_box|qed_vertex|qed_vac|penguin|compton|s_channel|triangle|t_channel|w_exchange|bhabha_t|sunset|double_box</code> Instantiate editable physics diagram presets.</div>
+                        <div><code>qed_se x y length</code> Electron self-energy macro.</div>
+                        <div><code>qed_vp x y length</code> Vacuum polarization macro.</div>
+                        <div><code># comment</code> and <code>// comment</code> are ignored in script editor.</div>
+                        <div>You can separate commands with newlines or <code>;</code>.</div>
+                    </div>
+                </details>
+                <div class="form-text">Shortcuts: <code>/</code> focus command box, <code>Enter</code> run command, <code>Ctrl/⌘+Enter</code> run script.</div>
+            </div>
+            <div class="tool-section-title">Presets</div>
+            <div class="px-1 mb-2">
+                <label for="dsl-template-catalog" class="form-label small mb-1">Diagram catalog (editable macro)</label>
+                <select id="dsl-template-catalog" class="form-select form-select-sm mb-1">
+                    <option value="qed_box">QED Box</option>
+                    <option value="qed_vertex">QED Vertex</option>
+                    <option value="qed_vac">QED Vacuum</option>
+                    <option value="penguin">Penguin</option>
+                    <option value="compton">Compton</option>
+                    <option value="s_channel">s-channel</option>
+                    <option value="triangle">Triangle</option>
+                    <option value="t_channel">t-channel</option>
+                    <option value="w_exchange">W Exchange</option>
+                    <option value="bhabha_t">Bhabha t-channel</option>
+                    <option value="sunset">Sunset</option>
+                    <option value="double_box">Double Box</option>
+                </select>
+                <div id="dsl-template-help" class="small text-secondary mb-1">
+                    Select a preset to load its macro into the script editor.
+                </div>
+                <div class="btn-group btn-group-sm w-100">
+                    <button id="dsl-load-template-macro" type="button" class="btn btn-outline-secondary">Load Macro</button>
+                    <button id="dsl-run-template-macro" type="button" class="btn btn-success">Load + Run</button>
+                </div>
+            </div>
+            <div class="btn-group-vertical w-100 mb-2" role="group" aria-label="Physics templates">
+                <button type="button" class="btn btn-outline-secondary" data-template="qed_box" title="QED 1-loop box scattering">
+                    <i class="bi bi-bounding-box-circles"></i><span class="tool-label">QED Box</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="qed_vertex" title="QED vertex correction">
+                    <i class="bi bi-diagram-3"></i><span class="tool-label">QED Vertex</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="qed_vac" title="QED vacuum polarization">
+                    <i class="bi bi-circle"></i><span class="tool-label">QED Vacuum</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="penguin" title="Penguin diagram template">
+                    <i class="bi bi-bezier2"></i><span class="tool-label">Penguin</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="compton" title="Compton scattering">
+                    <i class="bi bi-diagram-2"></i><span class="tool-label">Compton</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="s_channel" title="s-channel topology">
+                    <i class="bi bi-signpost-split"></i><span class="tool-label">s-channel</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="triangle" title="Triangle loop">
+                    <i class="bi bi-triangle"></i><span class="tool-label">Triangle</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="t_channel" title="t-channel topology">
+                    <i class="bi bi-diagram-3"></i><span class="tool-label">t-channel</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="w_exchange" title="W exchange">
+                    <i class="bi bi-lightning-charge"></i><span class="tool-label">W Exchange</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="bhabha_t" title="Bhabha t-channel">
+                    <i class="bi bi-bezier"></i><span class="tool-label">Bhabha t</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="sunset" title="Sunset self-energy">
+                    <i class="bi bi-brightness-high"></i><span class="tool-label">Sunset</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-template="double_box" title="Double box loop">
+                    <i class="bi bi-grid-3x3-gap"></i><span class="tool-label">Double Box</span>
+                </button>
+            </div>
             <div class="tool-section-title">Tools</div>
             <div id="mode" class="tool-mode-indicator rounded-pill bg-body-secondary text-center fw-semibold mb-3 px-3 py-1">Select</div>
             <div class="btn-group-vertical w-100" role="group" aria-label="Drawing modes">
@@ -324,6 +504,12 @@
                 <button type="button" class="btn btn-outline-danger" data-command="delete" title="Delete the selected element">
                     <i class="bi bi-trash"></i><span class="tool-label">Delete</span>
                 </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="group-selection" data-selection-required="true" title="Group selected elements">
+                    <i class="bi bi-collection"></i><span class="tool-label">Group</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" data-command="ungroup-selection" data-selection-required="true" title="Ungroup selected group">
+                    <i class="bi bi-layout-split"></i><span class="tool-label">Ungroup</span>
+                </button>
             </div>
             <div id="loop-controls" class="loop-controls d-none">
                 <div class="tool-section-title mb-2">Loop controls</div>
@@ -374,11 +560,39 @@
     </div>
 
     <div id="canvas-context-menu" class="bg-body-tertiary border shadow-sm rounded p-1">
+        <button type="button" class="context-menu-item" data-command="undo">
+            <i class="bi bi-arrow-counterclockwise"></i><span>Undo</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="redo">
+            <i class="bi bi-arrow-clockwise"></i><span>Redo</span>
+        </button>
+        <hr>
         <button type="button" class="context-menu-item" data-command="select-here">
             <i class="bi bi-cursor"></i><span>Select here</span>
         </button>
         <button type="button" class="context-menu-item" data-command="sub-select-here">
             <i class="bi bi-crosshair"></i><span>Set sub-selection</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="select-all">
+            <i class="bi bi-bounding-box"></i><span>Select all</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="copy-selection" data-selection-required="true">
+            <i class="bi bi-copy"></i><span>Copy selection</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="cut-selection" data-selection-required="true">
+            <i class="bi bi-scissors"></i><span>Cut selection</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="paste-selection">
+            <i class="bi bi-clipboard-plus"></i><span>Paste</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="edit-selection-macro" data-selection-required="true">
+            <i class="bi bi-code-slash"></i><span>Edit as macro</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="group-selection" data-selection-required="true">
+            <i class="bi bi-collection"></i><span>Group</span>
+        </button>
+        <button type="button" class="context-menu-item" data-command="ungroup-selection" data-selection-required="true">
+            <i class="bi bi-layout-split"></i><span>Ungroup</span>
         </button>
         <hr>
         <button type="button" class="context-menu-item" data-command="add-vertex">
@@ -394,7 +608,7 @@
             <i class="bi bi-card-text"></i><span>Add text</span>
         </button>
         <hr>
-        <button type="button" class="context-menu-item text-danger" data-command="delete">
+        <button type="button" class="context-menu-item text-danger" data-command="delete" data-selection-required="true">
             <i class="bi bi-trash"></i><span>Delete selection</span>
         </button>
     </div>
@@ -435,7 +649,8 @@
                     </div>
                     <div class="select">
                         <p>Select tool: click to select, Shift+click to set the sub selection.</p>
-                        <p>Right-click anywhere to open the context menu for quick add, delete, or propagator actions.</p>
+                        <p>Right-click opens a context menu with select-all, copy, paste, and selection-aware actions.</p>
+                        <p>Use <strong>Edit as macro</strong> from the right-click menu to export selected lines/loops into editable DSL and replace the selection by running the edited script.</p>
                         <p>Drag on the canvas to draw a selection box; hold Shift to add to the current selection.</p>
                         <p>Drag a selected element to move the whole selection; Delete removes everything selected.</p>
                         <p>Hold Alt while dragging to start a marquee even when the pointer is above existing geometry.</p>
@@ -443,19 +658,29 @@
                     <div class="linestyle">
                         <p>The Selection actions buttons toggle arrows, cycle styles, rotate arrow heads, and fill loops.</p>
                         <p>Keep clicking with the propagator tool to chain multiple segments.</p>
+                        <p>While drawing a propagator, nearby vertices show snap feedback and the preview line snaps magnetically.</p>
                     </div>
                     <div class="loop">
                         <p>Use the Loop controls sliders to resize a loop or adjust the missing segment.</p>
                         <p>The preset buttons quickly restore a full loop or open common gaps.</p>
+                        <p>When a loop is selected, drag the red radius handle on-canvas for direct resize.</p>
                     </div>
                     <div class="move">
                         <p>Use the arrow keys to nudge the selection by one grid unit.</p>
                         <p>Press Delete or Backspace to remove the current selection.</p>
+                        <p>Drag a vertex to move all connected lines/loops; hold Alt while dragging a line endpoint to detach from vertex.</p>
                     </div>
                     <div class="mode">
                         <p>Ctrl / ⌘ + Z for undo, Ctrl / ⌘ + Shift + Z or Ctrl / ⌘ + Y for redo.</p>
-                        <p>Ctrl / ⌘ + C copies the selection, Ctrl / ⌘ + E exports SVG text, Ctrl / ⌘ + P exports TikZ.</p>
+                        <p>Ctrl / ⌘ + G groups selection, Ctrl / ⌘ + Shift + G ungroups.</p>
+                        <p>Ctrl / ⌘ + S performs Quick Save to browser local storage (no download dialog).</p>
+                        <p>Ctrl / ⌘ + A selects all, Ctrl / ⌘ + C copies, Ctrl / ⌘ + X cuts, Ctrl / ⌘ + V pastes, Ctrl / ⌘ + E exports SVG text, Ctrl / ⌘ + P exports TikZ.</p>
+                        <p>Mouse wheel zooms. Hold Space and drag to pan the canvas.</p>
                         <p>Press Esc to cancel a propagator draft and return to the Select tool.</p>
+                        <p>Use the <strong>DSL Studio</strong> panel for paper-quality diagram authoring: quick command, macro builder, and script editor.</p>
+                        <p>Use <strong>Diagram catalog (editable macro)</strong> to load a template macro into <code>dsl-script</code>, tweak it, and run immediately.</p>
+                        <p>For scripted workflows, write one command per line in <code>dsl-script</code> and run with <code>Ctrl/⌘ + Enter</code> or the Run Script button.</p>
+                        <p>Press <code>/</code> to focus the quick command box (<code>dsl-input</code>), then <code>Enter</code> to execute instantly.</p>
                     </div>
                 </div>
 

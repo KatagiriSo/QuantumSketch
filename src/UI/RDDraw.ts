@@ -4,14 +4,32 @@ import { Elem } from "../Core/Elem";
 import { isLoop, Loop } from "../Core/Loop";
 import { isString, MyString } from "../Core/MyString";
 import { Vector, isVector } from "../Core/Vector";
+import { Vertex } from "../Core/Vertex";
+import { Group, isGroup } from "../Core/Group";
 import { loggerVer } from "../looger";
+import { ScriptEngine } from "../Scripting/ScriptEngine";
 import { draw } from "./draw";
 import { DrawContext } from "./DrawContext";
 import { DrawMode } from "./DrawMode";
 import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
-import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle, SetLoopRadius, SetLoopBeginAngle, SetLoopEndAngle, SetLoopAngles, MoveGroup, DeleteGroup, SetLineEndpoint, SetLineControlPoint, RotateArrow, SetArrowRotation } from "./RepositoryCommand";
+import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle, SetLoopRadius, SetLoopBeginAngle, SetLoopEndAngle, SetLoopAngles, MoveGroup, DeleteGroup, SetLineEndpoint, SetLineControlPoint, RotateArrow, SetArrowRotation, GroupSelection, UngroupSelection } from "./RepositoryCommand";
 import { CommandRegistry, CommandHost } from "./CommandRegistry";
+
+type InteractionState =
+  | {
+      type: "idle";
+    }
+  | {
+      type: "potentialClick";
+      startPointer: Vector;
+      hit?: Elem;
+      additive: boolean;
+      forceRect: boolean;
+    }
+  | {
+      type: "dragging";
+    };
 
 /**
  * Central UI orchestrator for the editor. This class owns the canvas draw
@@ -21,10 +39,10 @@ import { CommandRegistry, CommandHost } from "./CommandRegistry";
  */
 export class RDDraw implements CommandHost {
   repository: RDRepository = new RDRepository();
+  private scriptEngine: ScriptEngine;
   canvas: HTMLCanvasElement;
   context: CanvasRenderingContext2D;
   drawContext: DrawContext;
-  isMouseDown: "Up" | "Down" | "Downning" = "Up";
   // private prevX: number = 0;
   // private prevY: number = 0;
   private pointerPrev: Vector = new Vector(0, 0);
@@ -73,29 +91,66 @@ export class RDDraw implements CommandHost {
         lastPointer: Vector;
         initial: { origin: Vector; to: Vector; control: Vector | null };
         createdControl: boolean;
+        detachMode: boolean;
+      }
+    | {
+        type: "loop-handle";
+        loop: Loop;
+        handle: "radius";
+        startPointer: Vector;
+        startRadius: number;
       };
   private selectionRect?: { x1: number; y1: number; x2: number; y2: number };
-  private suppressClick = false;
-  private pendingDrag?: {
-    startPointer: Vector;
-    hit?: Elem;
-    additive: boolean;
-    forceRect: boolean;
-  };
+  private interactionState: InteractionState = { type: "idle" };
+  private linePreviewEnd?: Vector;
+  private hoveredSnapVertex?: Vector;
+  private hoveredSnapGrid?: Vector;
+  private spacePanActive = false;
+  private panDragLast?: Vector;
   private lastHitContext?: { point: Vector; tolerance: number };
+  private clipboardSnapshot?: {
+    vertices: Array<{ id: string; x: number; y: number }>;
+    lines: Array<{
+      startId: string;
+      endId: string;
+      style: Line["style"];
+      label: string;
+      labelDiff: number;
+      allow: Boolean;
+      arrowRotation: number;
+      control: Vector | null;
+    }>;
+    loops: Array<{
+      centerId: string;
+      radius: number;
+      style: Loop["style"];
+      allow: Boolean;
+      fill: boolean;
+      label: string;
+      loopBeginAngle: number;
+      loopEndAngle: number;
+    }>;
+    strings: Array<{
+      x: number;
+      y: number;
+      label: string;
+    }>;
+  };
+  private dslScriptElement: HTMLTextAreaElement | null = null;
+  private dslStatusElement: HTMLElement | null = null;
+  private dslLogElement: HTMLElement | null = null;
+  private selectionMacroEditMode = false;
   constructor(canvas: HTMLCanvasElement, drawContext: DrawContext) {
     this.canvas = canvas;
     this.context = canvas.getContext("2d")!;
     this.drawContext = drawContext;
+    this.scriptEngine = new ScriptEngine(this.repository);
     this.registerCommands();
     this.bind();
     this.drawAll();
   }
 
   bind() {
-    this.canvas.addEventListener("click", (ev) => {
-      this.onCanvasClick(ev);
-    });
     this.canvas.addEventListener("dblclick", (ev) => {
       this.onCanvasDoubleClick(ev);
     });
@@ -114,6 +169,15 @@ export class RDDraw implements CommandHost {
 
     document.addEventListener("keydown", (ev) => {
       this.onKeyDown(ev);
+    });
+    document.addEventListener("keyup", (ev) => {
+      this.onKeyUp(ev);
+    });
+    this.canvas.addEventListener("wheel", (ev) => {
+      this.onCanvasWheel(ev);
+    }, { passive: false });
+    window.addEventListener("resize", () => {
+      this.resizeCanvasToViewport();
     });
 
     (document.getElementById("nav-redo"))?.addEventListener("click", (ev: Event) => {
@@ -143,6 +207,399 @@ export class RDDraw implements CommandHost {
     this.initializeCommandTriggers();
     this.setupContextMenu();
     this.setupLoopControls();
+    this.setupScriptInput();
+    this.setupTemplatePresets();
+    this.resizeCanvasToViewport();
+  }
+
+  private setupTemplatePresets() {
+    const dslScript = document.getElementById("dsl-script") as HTMLTextAreaElement | null;
+    const templateCatalog = document.getElementById("dsl-template-catalog") as HTMLSelectElement | null;
+    const templateHelp = document.getElementById("dsl-template-help") as HTMLElement | null;
+    const loadMacroButton = document.getElementById("dsl-load-template-macro") as HTMLButtonElement | null;
+    const runMacroButton = document.getElementById("dsl-run-template-macro") as HTMLButtonElement | null;
+    const dslStatus = document.getElementById("dsl-status") as HTMLElement | null;
+    const dslLog = document.getElementById("dsl-log") as HTMLElement | null;
+
+    const templateCatalogItems = this.scriptEngine.getTemplateCatalog();
+
+    const setStatus = (message: string, type: "neutral" | "ok" | "error" = "neutral") => {
+      if (!dslStatus) {
+        return;
+      }
+      dslStatus.textContent = message;
+      dslStatus.classList.remove("text-secondary", "text-success", "text-danger");
+      if (type === "ok") {
+        dslStatus.classList.add("text-success");
+        return;
+      }
+      if (type === "error") {
+        dslStatus.classList.add("text-danger");
+        return;
+      }
+      dslStatus.classList.add("text-secondary");
+    };
+
+    const appendLog = (text: string, kind: "ok" | "error" | "info" = "info") => {
+      if (!dslLog) {
+        return;
+      }
+      const stamp = new Date().toLocaleTimeString();
+      const prefix = kind === "ok" ? "OK" : kind === "error" ? "ERR" : "INFO";
+      const line = `[${stamp}] ${prefix} ${text}`;
+      const previous = dslLog.textContent;
+      if (!previous || previous === "Execution log is empty.") {
+        dslLog.textContent = line;
+        return;
+      }
+      dslLog.textContent = `${line}\n${previous}`;
+    };
+
+    const updateTemplateHelp = (templateName: string) => {
+      if (!templateHelp) {
+        return;
+      }
+      const matched = templateCatalogItems.find((item) => item.name === templateName);
+      if (!matched) {
+        templateHelp.textContent = "Select a preset to load its macro into the script editor.";
+        return;
+      }
+      templateHelp.textContent = `${matched.label}: ${matched.description}`;
+    };
+
+    const loadTemplateMacro = (templateName: string, runNow: boolean): boolean => {
+      const macro = this.scriptEngine.buildTemplateMacro(templateName);
+      if (!macro) {
+        setStatus(`Unknown template '${templateName}'.`, "error");
+        appendLog(`Template macro failed: unknown '${templateName}'.`, "error");
+        return false;
+      }
+
+      if (dslScript) {
+        dslScript.value = macro;
+        dslScript.focus();
+        dslScript.setSelectionRange(0, dslScript.value.length);
+      }
+      updateTemplateHelp(templateName);
+      setStatus("Template macro loaded into script editor.", "ok");
+      appendLog(`Template macro loaded: ${templateName}`, "info");
+
+      if (!runNow) {
+        return true;
+      }
+
+      const batch = this.scriptEngine.executeScript(macro, true);
+      if (batch.executed > 0) {
+        this.drawAll();
+      }
+      if (!batch.success) {
+        setStatus(batch.message, "error");
+        appendLog(batch.message, "error");
+        return false;
+      }
+      setStatus(`Template executed: ${templateName}`, "ok");
+      appendLog(`Template executed: ${templateName}`, "ok");
+      return true;
+    };
+
+    templateCatalog?.addEventListener("change", () => {
+      if (!templateCatalog.value) {
+        updateTemplateHelp("");
+        return;
+      }
+      loadTemplateMacro(templateCatalog.value, false);
+    });
+
+    loadMacroButton?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const selected = templateCatalog?.value || "";
+      if (!selected) {
+        setStatus("Choose a template from the catalog first.", "neutral");
+        return;
+      }
+      loadTemplateMacro(selected, false);
+    });
+
+    runMacroButton?.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      const selected = templateCatalog?.value || "";
+      if (!selected) {
+        setStatus("Choose a template from the catalog first.", "neutral");
+        return;
+      }
+      loadTemplateMacro(selected, true);
+    });
+
+    const presetButtons = document.querySelectorAll<HTMLButtonElement>("[data-template]");
+    presetButtons.forEach((button) => {
+      button.addEventListener("click", (ev) => {
+        ev.preventDefault();
+        const template = button.dataset.template;
+        if (!template) {
+          return;
+        }
+        if (templateCatalog) {
+          templateCatalog.value = template;
+        }
+        const executed = loadTemplateMacro(template, true);
+        if (!executed) {
+          loggerVer(`template '${template}' failed.`);
+        }
+      });
+    });
+
+    updateTemplateHelp(templateCatalog?.value ?? "");
+  }
+
+  private setupScriptInput() {
+    const dslInput = document.getElementById("dsl-input") as HTMLInputElement | null;
+    if (!dslInput) {
+      return;
+    }
+
+    const dslRun = document.getElementById("dsl-run") as HTMLButtonElement | null;
+    const dslClear = document.getElementById("dsl-clear") as HTMLButtonElement | null;
+    const dslExampleSelect = document.getElementById("dsl-example-select") as HTMLSelectElement | null;
+    const dslInsertExample = document.getElementById("dsl-insert-example") as HTMLButtonElement | null;
+    const dslScript = document.getElementById("dsl-script") as HTMLTextAreaElement | null;
+    const dslRunScript = document.getElementById("dsl-run-script") as HTMLButtonElement | null;
+    const dslCopyScript = document.getElementById("dsl-copy-script") as HTMLButtonElement | null;
+    const dslMacroKind = document.getElementById("dsl-macro-kind") as HTMLSelectElement | null;
+    const dslMacroX = document.getElementById("dsl-macro-x") as HTMLInputElement | null;
+    const dslMacroY = document.getElementById("dsl-macro-y") as HTMLInputElement | null;
+    const dslMacroLength = document.getElementById("dsl-macro-length") as HTMLInputElement | null;
+    const dslBuildMacro = document.getElementById("dsl-build-macro") as HTMLButtonElement | null;
+    const dslStatus = document.getElementById("dsl-status") as HTMLElement | null;
+    const dslLog = document.getElementById("dsl-log") as HTMLElement | null;
+    this.dslScriptElement = dslScript;
+    this.dslStatusElement = dslStatus;
+    this.dslLogElement = dslLog;
+
+    const appendLog = (text: string, kind: "ok" | "error" | "info" = "info") => this.appendDslLog(text, kind);
+    const setStatus = (message: string, type: "neutral" | "ok" | "error" = "neutral") => this.setDslStatus(message, type);
+
+    const runCommand = (command: string): boolean => {
+      if (!command) {
+        setStatus("Enter a DSL command to run.", "neutral");
+        return false;
+      }
+
+      if (command.includes(";") || command.includes("\n")) {
+        const batch = this.scriptEngine.executeScript(command, true);
+        if (batch.executed > 0) {
+          this.drawAll();
+        }
+        if (batch.success) {
+          setStatus(batch.message, "ok");
+          appendLog(batch.message, "ok");
+          dslInput.classList.remove("is-invalid");
+          return true;
+        }
+        setStatus(batch.message, "error");
+        appendLog(batch.message, "error");
+        dslInput.classList.add("is-invalid");
+        return false;
+      }
+
+      const result = this.scriptEngine.execute(command);
+      if (result.success) {
+        this.drawAll();
+        setStatus(`Executed: ${command}`, "ok");
+        appendLog(command, "ok");
+        dslInput.classList.remove("is-invalid");
+        return true;
+      } else {
+        setStatus(result.message, "error");
+        appendLog(`Command failed: ${command} (${result.message})`, "error");
+        dslInput.classList.add("is-invalid");
+        return false;
+      }
+    };
+
+    dslInput.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      if (ev.key === "Enter") {
+        ev.preventDefault();
+        const command = dslInput.value.trim();
+        if (runCommand(command)) {
+          dslInput.value = "";
+        }
+        return;
+      }
+      if (ev.key === "Escape") {
+        ev.preventDefault();
+        dslInput.blur();
+      }
+    });
+
+    dslInput.addEventListener("input", () => {
+      dslInput.classList.remove("is-invalid");
+      setStatus("", "neutral");
+    });
+
+    dslRun?.addEventListener("click", () => {
+      const command = dslInput.value.trim();
+      if (runCommand(command)) {
+        dslInput.value = "";
+      }
+      dslInput.focus();
+    });
+
+    dslClear?.addEventListener("click", () => {
+      dslInput.value = "";
+      dslInput.classList.remove("is-invalid");
+      setStatus("", "neutral");
+      dslInput.focus();
+      appendLog("Command input cleared.", "info");
+    });
+
+    dslInsertExample?.addEventListener("click", () => {
+      if (!dslExampleSelect || !dslExampleSelect.value) {
+        setStatus("Select an example command first.", "neutral");
+        return;
+      }
+      dslInput.value = dslExampleSelect.value;
+      dslInput.classList.remove("is-invalid");
+      setStatus("Example inserted. Press Run or Enter.", "neutral");
+      dslInput.focus();
+      dslInput.select();
+      appendLog(`Example loaded: ${dslExampleSelect.value}`, "info");
+    });
+
+    dslExampleSelect?.addEventListener("change", () => {
+      if (!dslExampleSelect.value) {
+        return;
+      }
+      dslInput.value = dslExampleSelect.value;
+      dslInput.classList.remove("is-invalid");
+      setStatus("Example loaded to input.", "neutral");
+    });
+
+    dslBuildMacro?.addEventListener("click", () => {
+      const kind = dslMacroKind?.value || "qed_se";
+      const x = Number(dslMacroX?.value ?? "10");
+      const y = Number(dslMacroY?.value ?? "15");
+      const length = Number(dslMacroLength?.value ?? "40");
+      if (![x, y, length].every((value) => Number.isFinite(value))) {
+        setStatus("Macro parameters must be numeric.", "error");
+        appendLog("Macro build failed: invalid numeric parameter.", "error");
+        return;
+      }
+      const command = `${kind} ${x} ${y} ${length}`;
+      dslInput.value = command;
+      dslInput.classList.remove("is-invalid");
+      setStatus("Macro command created in quick command box.", "ok");
+      appendLog(`Macro created: ${command}`, "info");
+      dslInput.focus();
+      dslInput.select();
+    });
+
+    const focusScriptLine = (line: number) => {
+      if (!dslScript || line < 1) {
+        return;
+      }
+      const rows = dslScript.value.split(/\r?\n/);
+      let start = 0;
+      for (let index = 0; index < line - 1 && index < rows.length; index++) {
+        start += rows[index].length + 1;
+      }
+      const end = start + (rows[line - 1]?.length ?? 0);
+      dslScript.focus();
+      dslScript.setSelectionRange(start, end);
+    };
+
+    const runScript = () => {
+      if (!dslScript) {
+        return;
+      }
+      if (this.selectionMacroEditMode) {
+        const applied = this.applySelectionMacroScript(dslScript.value);
+        if (applied) {
+          setStatus("Selection replaced from macro.", "ok");
+          appendLog("Selection macro applied.", "ok");
+        }
+        return;
+      }
+      const batch = this.scriptEngine.executeScript(dslScript.value, true);
+      if (batch.total === 0) {
+        setStatus(batch.message, "neutral");
+        appendLog(batch.message, "info");
+        return;
+      }
+      if (batch.executed > 0) {
+        this.drawAll();
+      }
+      if (batch.success) {
+        setStatus(batch.message, "ok");
+        appendLog(batch.message, "ok");
+      } else {
+        setStatus(batch.message, "error");
+        appendLog(batch.message, "error");
+        if (batch.failedLine) {
+          focusScriptLine(batch.failedLine);
+        }
+      }
+    };
+
+    dslRunScript?.addEventListener("click", () => {
+      runScript();
+    });
+
+    dslScript?.addEventListener("keydown", (ev) => {
+      ev.stopPropagation();
+      const isMeta = ev.ctrlKey || ev.metaKey;
+      if (isMeta && ev.key === "Enter") {
+        ev.preventDefault();
+        runScript();
+      }
+    });
+
+    dslCopyScript?.addEventListener("click", () => {
+      if (!dslScript) {
+        return;
+      }
+      const text = dslScript.value;
+      if (!text.trim()) {
+        setStatus("Script editor is empty.", "neutral");
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          setStatus("Script copied to clipboard.", "ok");
+          appendLog("Script copied to clipboard.", "info");
+        }).catch(() => {
+          dslScript.focus();
+          dslScript.select();
+          setStatus("Clipboard API unavailable. Selected script text instead.", "neutral");
+          appendLog("Clipboard API unavailable; selected script text.", "info");
+        });
+      } else {
+        dslScript.focus();
+        dslScript.select();
+        setStatus("Clipboard API unavailable. Selected script text instead.", "neutral");
+        appendLog("Clipboard API unavailable; selected script text.", "info");
+      }
+    });
+
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "/") {
+        return;
+      }
+      if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.shiftKey) {
+        return;
+      }
+      const target = ev.target as HTMLElement | null;
+      if (target === dslInput) {
+        return;
+      }
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) {
+        return;
+      }
+      ev.preventDefault();
+      dslInput.focus();
+      dslInput.select();
+      setStatus("DSL input focused.", "neutral");
+    });
   }
 
   /**
@@ -276,6 +733,48 @@ export class RDDraw implements CommandHost {
     });
 
     registry.register({
+      id: "select-all",
+      description: "Select all elements on the canvas",
+      execute: ({ host }) => host.selectAll(),
+    });
+
+    registry.register({
+      id: "copy-selection",
+      description: "Copy selected elements",
+      execute: ({ host }) => host.copySelection(),
+    });
+
+    registry.register({
+      id: "cut-selection",
+      description: "Cut selected elements",
+      execute: ({ host }) => host.cutSelection(),
+    });
+
+    registry.register({
+      id: "paste-selection",
+      description: "Paste copied elements",
+      execute: ({ host }) => host.pasteSelection(),
+    });
+
+    registry.register({
+      id: "group-selection",
+      description: "Group selected elements",
+      execute: ({ host }) => host.groupSelection(),
+    });
+
+    registry.register({
+      id: "ungroup-selection",
+      description: "Ungroup selected group element",
+      execute: ({ host }) => host.ungroupSelection(),
+    });
+
+    registry.register({
+      id: "edit-selection-macro",
+      description: "Export the selection to editable DSL macro text",
+      execute: ({ host }) => host.openSelectionMacroEditor(),
+    });
+
+    registry.register({
       id: "undo",
       description: "Undo the last change",
       execute: ({ host }) => host.undo(),
@@ -345,7 +844,7 @@ export class RDDraw implements CommandHost {
   private selectAt(point: Vector, additive: boolean) {
     this.resetLoopPreview();
     const currentId = this.repository.currentElement()?.id;
-    const hit = this.repository.findElement(point, currentId);
+    const hit = this.repository.findElement(point, currentId, this.worldTolerance(12));
     if (!hit) {
       if (!additive) {
         this.repository.clearSelectMode();
@@ -378,7 +877,6 @@ export class RDDraw implements CommandHost {
       elem.move(deltaStep);
     });
     this.drawAll();
-    this.suppressClick = true;
   }
 
   private performHandleDrag(pointer: Vector) {
@@ -391,7 +889,11 @@ export class RDDraw implements CommandHost {
     this.dragSession.lastPointer = pointer;
 
     if (session.handle === "origin") {
-      line.origin.moveAbsolute(pointer);
+      if (session.detachMode) {
+        line.origin = new Vector(pointer.x, pointer.y);
+      } else {
+        line.origin.moveAbsolute(pointer);
+      }
       if (initial.control) {
         const delta = pointer.minus(initial.origin);
         const newControl = initial.control.add(delta);
@@ -402,7 +904,11 @@ export class RDDraw implements CommandHost {
         }
       }
     } else if (session.handle === "to") {
-      line.to.moveAbsolute(pointer);
+      if (session.detachMode) {
+        line.to = new Vector(pointer.x, pointer.y);
+      } else {
+        line.to.moveAbsolute(pointer);
+      }
       if (initial.control) {
         const delta = pointer.minus(initial.to);
         const newControl = initial.control.add(delta);
@@ -421,7 +927,6 @@ export class RDDraw implements CommandHost {
     }
 
     this.drawAll();
-    this.suppressClick = true;
   }
 
   private insertVertex(point: Vector): Vector {
@@ -432,7 +937,7 @@ export class RDDraw implements CommandHost {
   }
 
   private ensureVertex(point: Vector): Vector {
-    const tolerance = 2;
+    const tolerance = this.worldTolerance(10);
     const existing = this.findNearestVertex(point, tolerance);
     if (existing) {
       this.repository.setCurrentElement(existing);
@@ -488,6 +993,7 @@ export class RDDraw implements CommandHost {
     const startPoint = this.resolveLinePoint(point);
     if (!this.lineDraftStart) {
       this.lineDraftStart = startPoint;
+      this.linePreviewEnd = startPoint.copy();
       this.repository.setCurrentElement(startPoint);
       this.drawAll();
       return;
@@ -505,18 +1011,19 @@ export class RDDraw implements CommandHost {
     line.to = endPoint;
     this.repository.doCommand(new SetLine(line));
     this.lineDraftStart = undefined;
+    this.linePreviewEnd = undefined;
     this.repository.clearSelectMode();
     this.setDrawMode("normal");
   }
 
   private resolveLinePoint(point: Vector): Vector {
-    const tolerance = 2;
+    const tolerance = this.worldTolerance(10);
     const existingVertex = this.findNearestVertex(point, tolerance);
     if (existingVertex) {
       return existingVertex;
     }
 
-    const existingLine = this.findNearestLine(point, tolerance * 2);
+    const existingLine = this.findNearestLine(point, tolerance * 1.6);
     if (existingLine) {
       const projected = existingLine.closestPoint(point);
       const snap = new Vector(projected.x, projected.y);
@@ -527,6 +1034,15 @@ export class RDDraw implements CommandHost {
     const snapPoint = this.snapToGrid(point);
     this.repository.doCommand(new SetVertex(snapPoint));
     return this.repository.currentElement() as Vector;
+  }
+
+  private resolveLineHoverPoint(point: Vector): Vector {
+    const tolerance = this.worldTolerance(12);
+    const existingVertex = this.findNearestVertex(point, tolerance);
+    if (existingVertex) {
+      return existingVertex.copy();
+    }
+    return this.snapToGrid(point);
   }
 
   private snapToGrid(point: Vector): Vector {
@@ -580,6 +1096,7 @@ export class RDDraw implements CommandHost {
       return;
     }
     this.lineDraftStart = undefined;
+    this.linePreviewEnd = undefined;
     this.drawAll();
   }
 
@@ -597,6 +1114,13 @@ export class RDDraw implements CommandHost {
     this.canvas.addEventListener("contextmenu", (ev) => {
       ev.preventDefault();
       this.setPrevXY(ev.offsetX, ev.offsetY);
+      const point = this.getPointer();
+      const hit = this.repository.findElement(point, this.repository.currentElement()?.id, this.worldTolerance(12));
+      if (hit && !this.repository.isSelected(hit)) {
+        this.repository.setCurrentElement(hit);
+        this.drawAll();
+      }
+      this.updateContextMenuBySelection();
       this.showContextMenu(ev.clientX, ev.clientY);
     });
 
@@ -718,6 +1242,23 @@ export class RDDraw implements CommandHost {
     menu.style.visibility = "visible";
   }
 
+  private updateContextMenuBySelection() {
+    if (!this.contextMenuElement) {
+      return;
+    }
+    const hasSelection = this.repository.getSelectedElements().length > 0;
+    this.contextMenuElement
+      .querySelectorAll<HTMLElement>("[data-selection-required]")
+      .forEach((element) => {
+        const requireSelection = element.dataset.selectionRequired === "true";
+        if (requireSelection && !hasSelection) {
+          element.classList.add("d-none");
+        } else {
+          element.classList.remove("d-none");
+        }
+      });
+  }
+
   private hideContextMenu() {
     if (!this.contextMenuElement) {
       return;
@@ -736,6 +1277,7 @@ export class RDDraw implements CommandHost {
     this.drawMode = mode;
     if (mode !== "line") {
       this.lineDraftStart = undefined;
+      this.linePreviewEnd = undefined;
     }
     this.drawAll();
   }
@@ -793,7 +1335,7 @@ export class RDDraw implements CommandHost {
       return null;
     }
 
-    const tolerance = 0.6;
+    const tolerance = this.worldTolerance(10);
     let bestMatch:
       | { line: Line; handle: "origin" | "to" | "control"; position: Vector; createControl: boolean }
       | null = null;
@@ -827,12 +1369,41 @@ export class RDDraw implements CommandHost {
     return bestMatch;
   }
 
+  private activeLoop(): Loop | undefined {
+    const current = this.repository.currentElement();
+    if (current && isLoop(current)) {
+      return current;
+    }
+    const selectedLoop = this.repository
+      .getSelectedElements()
+      .find((elem): elem is Loop => isLoop(elem));
+    return selectedLoop;
+  }
+
+  private loopRadiusHandlePoint(loop: Loop): Vector {
+    return new Vector(loop.origin.x + loop.radius, loop.origin.y);
+  }
+
+  private hitTestLoopHandle(point: Vector): { loop: Loop; handle: "radius" } | null {
+    const loop = this.activeLoop();
+    if (!loop) {
+      return null;
+    }
+    const handlePoint = this.loopRadiusHandlePoint(loop);
+    const distance = point.minus(handlePoint).length();
+    if (distance <= this.worldTolerance(10)) {
+      return { loop, handle: "radius" };
+    }
+    return null;
+  }
+
   private drawLineHandles(lines: Line[]) {
     if (lines.length === 0) {
       return;
     }
     const ctx = this.context;
     const scale = config.scale;
+    const offset = this.drawContext.getViewOffset();
     const baseRadius = Math.max(4, Math.min(6, scale * 0.35));
 
     lines.forEach((line) => {
@@ -844,9 +1415,9 @@ export class RDDraw implements CommandHost {
       ctx.lineWidth = 1;
       ctx.setLineDash(hasControl ? [4, 4] : [6, 6]);
       ctx.beginPath();
-      ctx.moveTo(line.origin.x * scale, line.origin.y * scale);
-      ctx.lineTo(controlPoint.x * scale, controlPoint.y * scale);
-      ctx.lineTo(line.to.x * scale, line.to.y * scale);
+      ctx.moveTo((line.origin.x + offset.x) * scale, (line.origin.y + offset.y) * scale);
+      ctx.lineTo((controlPoint.x + offset.x) * scale, (controlPoint.y + offset.y) * scale);
+      ctx.lineTo((line.to.x + offset.x) * scale, (line.to.y + offset.y) * scale);
       ctx.stroke();
       ctx.restore();
 
@@ -858,8 +1429,8 @@ export class RDDraw implements CommandHost {
 
       handles.forEach((handle) => {
         ctx.save();
-        const px = handle.point.x * scale;
-        const py = handle.point.y * scale;
+        const px = (handle.point.x + offset.x) * scale;
+        const py = (handle.point.y + offset.y) * scale;
         const radius = handle.ghost ? baseRadius + 2 : baseRadius;
         ctx.beginPath();
         ctx.arc(px, py, radius, 0, Math.PI * 2);
@@ -880,10 +1451,68 @@ export class RDDraw implements CommandHost {
     });
   }
 
+  private drawLoopHandles(loop?: Loop) {
+    if (!loop) {
+      return;
+    }
+    const ctx = this.context;
+    const scale = config.scale;
+    const offset = this.drawContext.getViewOffset();
+    const point = this.loopRadiusHandlePoint(loop);
+    const px = (point.x + offset.x) * scale;
+    const py = (point.y + offset.y) * scale;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(px, py, 6, 0, Math.PI * 2);
+    ctx.fillStyle = "rgba(220, 53, 69, 0.85)";
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 1.5;
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   setPrevXY(eventX: number, eventY: number) {
     this.rawPointer = new Vector(eventX, eventY);
     // loggerVer(`rawPointer ${this.rawPointer.x}  ${this.rawPointer.y}`);
   }
+
+  private worldTolerance(px = 10): number {
+    return px / Math.max(config.scale, 0.0001);
+  }
+
+  private resizeCanvasToViewport() {
+    const parent = this.canvas.parentElement;
+    if (!parent) {
+      return;
+    }
+    const rect = parent.getBoundingClientRect();
+    const width = Math.max(320, Math.floor(rect.width));
+    const height = Math.max(240, Math.floor(rect.height));
+    if (this.canvas.width !== width || this.canvas.height !== height) {
+      this.canvas.width = width;
+      this.canvas.height = height;
+      this.drawAll();
+    }
+  }
+
+  private onCanvasWheel(ev: WheelEvent) {
+    ev.preventDefault();
+    const before = this.getPointerPrecise();
+    const factor = ev.deltaY < 0 ? 1.08 : 1 / 1.08;
+    const nextScale = Math.max(4, Math.min(80, config.scale * factor));
+    if (Math.abs(nextScale - config.scale) < 1e-6) {
+      return;
+    }
+    config.scale = nextScale;
+    const after = this.getPointerPrecise();
+    const delta = before.minus(after);
+    const offset = this.drawContext.getViewOffset();
+    this.drawContext.setViewOffset(offset.add(delta));
+    this.drawAll();
+  }
+
   /**
    * Returns the last pointer position in canvas coordinates. Centralises
    * scaling logic so every command receives consistent values regardless of
@@ -891,26 +1520,20 @@ export class RDDraw implements CommandHost {
    */
   getPointer(): Vector {
     const scale = config.scale;
-    const p = this.rawPointer.multi(1 / scale).floor();
+    const offset = this.drawContext.getViewOffset();
+    const p = this.rawPointer.multi(1 / scale).minus(offset).floor();
     // loggerVer(`p ${p.x}  ${p.y}`);
     return p;
   }
 
   private getPointerPrecise(): Vector {
     const scale = config.scale;
-    return this.rawPointer.multi(1 / scale);
+    const offset = this.drawContext.getViewOffset();
+    return this.rawPointer.multi(1 / scale).minus(offset);
   }
 
-  private onCanvasClick(ev: MouseEvent) {
-    if (this.suppressClick) {
-      this.suppressClick = false;
-      return;
-    }
-    this.isMouseDown = "Up";
+  private handleCanvasClick(point: Vector, ev: MouseEvent) {
     this.resetLoopPreview();
-    this.setPrevXY(ev.offsetX, ev.offsetY);
-    const point = this.getPointer();
-
     switch (this.drawMode) {
       case "normal":
         this.selectAt(point, ev.shiftKey || ev.metaKey || ev.ctrlKey);
@@ -932,7 +1555,7 @@ export class RDDraw implements CommandHost {
 
   private onCanvasDoubleClick(ev: MouseEvent) {
     this.resetLoopPreview();
-    this.pendingDrag = undefined;
+    this.interactionState = { type: "idle" };
     this.dragSession = undefined;
     this.selectionRect = undefined;
 
@@ -947,7 +1570,6 @@ export class RDDraw implements CommandHost {
         this.repository.doCommand(new SetLineControlPoint(handleHit.line, controlPoint));
         this.repository.setCurrentElement(handleHit.line);
         this.drawAll();
-        this.suppressClick = true;
         return;
       }
     }
@@ -957,10 +1579,9 @@ export class RDDraw implements CommandHost {
     }
 
     const additive = ev.shiftKey || ev.metaKey || ev.ctrlKey;
-    const tolerance = 12;
+    const tolerance = this.worldTolerance(12);
     const candidates = this.repository.findAllNear(point, tolerance);
     if (candidates.length === 0) {
-      this.suppressClick = true;
       return;
     }
 
@@ -987,20 +1608,94 @@ export class RDDraw implements CommandHost {
     }
     this.lastHitContext = { point: point.copy(), tolerance };
     this.drawAll();
+  }
 
-    this.suppressClick = true;
+  private dragThresholdCanvas(): number {
+    return 3 / Math.max(config.scale, 0.0001);
+  }
+
+  private beginPotentialInteraction(point: Vector, ev: MouseEvent) {
+    if (this.drawMode !== "normal") {
+      this.interactionState = {
+        type: "potentialClick",
+        startPointer: point,
+        hit: undefined,
+        additive: ev.shiftKey || ev.metaKey || ev.ctrlKey,
+        forceRect: false,
+      };
+      return;
+    }
+
+    const additive = ev.shiftKey || ev.metaKey || ev.ctrlKey;
+    const forceRect = ev.altKey;
+    const hit = this.repository.findElement(point, this.repository.currentElement()?.id, this.worldTolerance(12));
+    if (hit && !this.repository.isSelected(hit)) {
+      if (additive) {
+        this.repository.toggleSelection(hit);
+      } else {
+        this.repository.setCurrentElement(hit);
+      }
+      this.drawAll();
+    } else if (!hit && !additive) {
+      this.repository.clearSelectMode();
+      this.drawAll();
+    }
+
+    this.interactionState = {
+      type: "potentialClick",
+      startPointer: point,
+      hit,
+      additive,
+      forceRect,
+    };
   }
 
   mouseDown(ev: MouseEvent) {
-    this.isMouseDown = "Downning";
     this.setPrevXY(ev.offsetX, ev.offsetY);
     const point = this.getPointer();
     const precisePoint = this.getPointerPrecise();
-    this.suppressClick = false;
-    this.pendingDrag = undefined;
+    this.interactionState = { type: "idle" };
     this.selectionRect = undefined;
 
+    if (this.spacePanActive || ev.button === 1) {
+      this.panDragLast = new Vector(ev.offsetX, ev.offsetY);
+      this.interactionState = { type: "dragging" };
+      this.dragSession = undefined;
+      return;
+    }
+
     if (this.drawMode === "normal") {
+      const loopHandle = this.hitTestLoopHandle(precisePoint);
+      if (loopHandle) {
+        this.dragSession = {
+          type: "loop-handle",
+          loop: loopHandle.loop,
+          handle: "radius",
+          startPointer: point,
+          startRadius: loopHandle.loop.radius,
+        };
+        this.interactionState = { type: "dragging" };
+        return;
+      }
+
+      const nearVertex = this.findNearestVertex(point, this.worldTolerance(12));
+      if (nearVertex) {
+        if (!this.repository.isSelected(nearVertex)) {
+          this.repository.setCurrentElement(nearVertex);
+          this.drawAll();
+        }
+        const selected = this.repository.getSelectedElements();
+        this.dragSession = {
+          type: "move",
+          elements: selected.length > 0 ? selected : [nearVertex],
+          startPointer: point,
+          lastPointer: point,
+          totalDelta: new Vector(0, 0),
+        };
+        this.interactionState = { type: "dragging" };
+        return;
+      }
+
       const handleHit = this.hitTestLineHandle(precisePoint);
       if (handleHit) {
         const { line, handle, createControl } = handleHit;
@@ -1020,49 +1715,28 @@ export class RDDraw implements CommandHost {
             control: line.control ? line.control.copy() : null,
           },
           createdControl: createControl,
+          detachMode: ev.altKey,
         };
-        this.pendingDrag = undefined;
-        this.suppressClick = true;
+        this.interactionState = { type: "dragging" };
         return;
       }
-
-      const additive = ev.shiftKey || ev.metaKey || ev.ctrlKey;
-      const forceRect = ev.altKey;
-      const hit = this.repository.findElement(point, this.repository.currentElement()?.id);
-
-      if (hit) {
-        const alreadySelected = this.repository.isSelected(hit);
-        if (!alreadySelected) {
-          if (additive) {
-            this.repository.toggleSelection(hit);
-          } else {
-            this.repository.setCurrentElement(hit);
-          }
-          this.drawAll();
-        }
-      } else if (!additive) {
-        this.repository.clearSelectMode();
-        this.drawAll();
-      }
-
-      this.pendingDrag = {
-        startPointer: point,
-        hit,
-        additive,
-        forceRect,
-      };
     }
-
-    setTimeout(() => {
-      if (this.isMouseDown == "Downning") {
-        this.isMouseDown = "Down";
-      }
-    }, 300);
+    this.beginPotentialInteraction(point, ev);
   }
 
   mouseUp(ev: MouseEvent) {
-    this.isMouseDown = "Up";
-    this.pendingDrag = undefined;
+    this.setPrevXY(ev.offsetX, ev.offsetY);
+    const point = this.getPointer();
+    const state = this.interactionState;
+    this.interactionState = { type: "idle" };
+    this.panDragLast = undefined;
+
+    if (state.type === "potentialClick") {
+      this.selectionRect = undefined;
+      this.handleCanvasClick(point, ev);
+      return;
+    }
+
     if (!this.dragSession) {
       this.selectionRect = undefined;
       return;
@@ -1073,13 +1747,27 @@ export class RDDraw implements CommandHost {
       this.dragSession = undefined;
       const line = session.line;
       const initial = session.initial;
-      const finalOrigin = line.origin.copy();
-      const finalTo = line.to.copy();
+      let finalOrigin: Vector = line.origin.copy();
+      let finalTo: Vector = line.to.copy();
       let finalControl = line.control ? line.control.copy() : null;
 
       line.origin.moveAbsolute(initial.origin);
       line.to.moveAbsolute(initial.to);
       line.control = initial.control ? initial.control.copy() : null;
+
+      if (session.handle === "origin" && !session.detachMode) {
+        const snap = this.repository.findNearestVertex(finalOrigin, this.worldTolerance(12), line.startVertexId);
+        if (snap) {
+          finalOrigin = snap;
+        }
+      }
+
+      if (session.handle === "to" && !session.detachMode) {
+        const snap = this.repository.findNearestVertex(finalTo, this.worldTolerance(12), line.endVertexId);
+        if (snap) {
+          finalTo = snap;
+        }
+      }
 
       if (
         session.handle === "control" &&
@@ -1114,11 +1802,22 @@ export class RDDraw implements CommandHost {
         if (controlChanged) {
           this.repository.doCommand(new SetLineControlPoint(line, finalControl));
         } else if (session.createdControl && !finalControl) {
-          // revert creation without change
           line.control = null;
         }
       }
 
+      this.drawAll();
+      return;
+    }
+
+    if (this.dragSession.type === "loop-handle") {
+      const session = this.dragSession;
+      this.dragSession = undefined;
+      const loop = session.loop;
+      const radius = Math.max(1, point.minus(loop.origin).length());
+      if (Math.abs(radius - session.startRadius) > 1e-6) {
+        this.repository.doCommand(new SetLoopRadius(loop, radius));
+      }
       this.drawAll();
       return;
     }
@@ -1148,10 +1847,7 @@ export class RDDraw implements CommandHost {
           { x1: rect.start.x, y1: rect.start.y, x2: rect.current.x, y2: rect.current.y },
           additive
         );
-        this.suppressClick = true;
         this.drawAll();
-      } else {
-        this.suppressClick = false;
       }
       return;
     }
@@ -1163,13 +1859,35 @@ export class RDDraw implements CommandHost {
     this.setPrevXY(ev.offsetX, ev.offsetY);
     const pointer = this.getPointer();
 
-    if (this.pendingDrag) {
-      const delta = pointer.minus(this.pendingDrag.startPointer);
-      const threshold = 0.2;
-      if (Math.abs(delta.x) > threshold || Math.abs(delta.y) > threshold) {
-        const hit = this.pendingDrag.hit;
-        const additive = this.pendingDrag.additive;
-        const forceRect = this.pendingDrag.forceRect;
+    if (this.panDragLast) {
+      const currentRaw = new Vector(ev.offsetX, ev.offsetY);
+      const deltaRaw = currentRaw.minus(this.panDragLast);
+      this.panDragLast = currentRaw;
+      const offset = this.drawContext.getViewOffset();
+      this.drawContext.setViewOffset(
+        offset.add(new Vector(deltaRaw.x / config.scale, deltaRaw.y / config.scale))
+      );
+      this.drawAll();
+      return;
+    }
+
+    if (this.drawMode === "line" && this.lineDraftStart) {
+      this.linePreviewEnd = this.resolveLineHoverPoint(pointer);
+      const nearVertex = this.findNearestVertex(pointer, this.worldTolerance(12));
+      this.hoveredSnapVertex = nearVertex ? nearVertex.copy() : undefined;
+      this.hoveredSnapGrid = nearVertex ? undefined : this.snapToGrid(pointer);
+    } else {
+      this.linePreviewEnd = undefined;
+      this.hoveredSnapVertex = undefined;
+      this.hoveredSnapGrid = undefined;
+    }
+
+    if (this.interactionState.type === "potentialClick") {
+      const delta = pointer.minus(this.interactionState.startPointer);
+      if (delta.length() > this.dragThresholdCanvas()) {
+        const hit = this.interactionState.hit;
+        const additive = this.interactionState.additive;
+        const forceRect = this.interactionState.forceRect;
         const selected = this.repository.getSelectedElements();
         const hitSelected = hit ? this.repository.isSelected(hit) : false;
         if (
@@ -1181,29 +1899,28 @@ export class RDDraw implements CommandHost {
           this.dragSession = {
             type: "move",
             elements,
-            startPointer: this.pendingDrag.startPointer,
-            lastPointer: this.pendingDrag.startPointer,
+            startPointer: this.interactionState.startPointer,
+            lastPointer: this.interactionState.startPointer,
             totalDelta: new Vector(0, 0),
           };
-          this.pendingDrag = undefined;
+          this.interactionState = { type: "dragging" };
           this.performMoveDrag(pointer);
         } else {
           const rectAdditive = additive;
           this.dragSession = {
             type: "rect",
-            start: this.pendingDrag.startPointer,
+            start: this.interactionState.startPointer,
             current: pointer,
             additive: rectAdditive,
           };
           this.selectionRect = {
-            x1: this.pendingDrag.startPointer.x,
-            y1: this.pendingDrag.startPointer.y,
+            x1: this.interactionState.startPointer.x,
+            y1: this.interactionState.startPointer.y,
             x2: pointer.x,
             y2: pointer.y,
           };
-          this.pendingDrag = undefined;
+          this.interactionState = { type: "dragging" };
           this.drawAll();
-          this.suppressClick = true;
           return;
         }
       }
@@ -1218,25 +1935,41 @@ export class RDDraw implements CommandHost {
         y2: pointer.y,
       };
       this.drawAll();
-      this.suppressClick = true;
       return;
     }
     if (this.dragSession?.type === "handle") {
       this.performHandleDrag(pointer);
       return;
     }
-    if (this.dragSession?.type === "move" && this.isMouseDown === "Down") {
+    if (this.dragSession?.type === "loop-handle") {
+      const loop = this.dragSession.loop;
+      const previewRadius = Math.max(1, pointer.minus(loop.origin).length());
+      loop.setRadius(previewRadius);
+      this.drawAll();
+      return;
+    }
+    if (this.dragSession?.type === "move") {
       this.performMoveDrag(pointer);
+      return;
+    }
+    if (this.drawMode === "line" && this.lineDraftStart) {
+      this.drawAll();
     }
   }
 
   private onKeyDown(ev: KeyboardEvent) {
-    if (this.isTextInput(ev)) {
+    const isMeta = ev.ctrlKey || ev.metaKey;
+    const key = ev.key.toLowerCase();
+
+    if (isMeta && key === "s") {
+      ev.preventDefault();
+      this.quickSaveSnapshot();
       return;
     }
 
-    const isMeta = ev.ctrlKey || ev.metaKey;
-    const key = ev.key.toLowerCase();
+    if (this.isTextInput(ev)) {
+      return;
+    }
 
     if (ev.key === "Escape") {
       if (this.drawMode === "line") {
@@ -1244,6 +1977,12 @@ export class RDDraw implements CommandHost {
       }
       this.resetLoopPreview();
       this.setDrawMode("normal");
+      return;
+    }
+
+    if (ev.code === "Space") {
+      ev.preventDefault();
+      this.spacePanActive = true;
       return;
     }
 
@@ -1270,7 +2009,36 @@ export class RDDraw implements CommandHost {
     }
 
     if (isMeta && key === "c") {
+      ev.preventDefault();
       this.copy();
+      return;
+    }
+
+    if (isMeta && key === "x") {
+      ev.preventDefault();
+      this.cutSelection();
+      return;
+    }
+
+    if (isMeta && key === "v") {
+      ev.preventDefault();
+      this.pasteSelection();
+      return;
+    }
+
+    if (isMeta && key === "a") {
+      ev.preventDefault();
+      this.selectAll();
+      return;
+    }
+
+    if (isMeta && key === "g") {
+      ev.preventDefault();
+      if (ev.shiftKey) {
+        this.ungroupSelection();
+      } else {
+        this.groupSelection();
+      }
       return;
     }
 
@@ -1308,6 +2076,28 @@ export class RDDraw implements CommandHost {
       ev.preventDefault();
       this.keyDown();
       return;
+    }
+  }
+
+  private onKeyUp(ev: KeyboardEvent) {
+    if (ev.code === "Space") {
+      this.spacePanActive = false;
+      this.panDragLast = undefined;
+    }
+  }
+
+  private quickSaveSnapshot() {
+    try {
+      const payload = {
+        savedAt: new Date().toISOString(),
+        data: this.repository.save(),
+      };
+      localStorage.setItem("quantumSketch.quickSave.latest", JSON.stringify(payload));
+      this.setDslStatus("Quick save completed (browser local storage).", "ok");
+      this.appendDslLog("Quick save: quantumSketch.quickSave.latest", "ok");
+    } catch (error) {
+      this.setDslStatus("Quick save failed.", "error");
+      this.appendDslLog(`Quick save failed: ${error}`, "error");
     }
   }
 
@@ -1498,13 +2288,20 @@ export class RDDraw implements CommandHost {
 
     if (this.drawMode === "line" && this.lineDraftStart) {
       draw(this.drawContext, this.lineDraftStart, "canvas", "sub");
-      const pointer = this.getPointer();
+      const pointer = this.linePreviewEnd ?? this.resolveLineHoverPoint(this.getPointer());
       this.drawContext.beginPath();
       this.drawContext.setStrokeColor("sub");
       this.drawContext.moveTo(this.lineDraftStart.x, this.lineDraftStart.y);
       this.drawContext.lineTo(pointer.x, pointer.y, "dash");
       this.drawContext.stroke();
       this.drawContext.closePath();
+    }
+
+    if (this.hoveredSnapGrid) {
+      draw(this.drawContext, this.hoveredSnapGrid, "canvas", "sub");
+    }
+    if (this.hoveredSnapVertex) {
+      draw(this.drawContext, this.hoveredSnapVertex, "canvas", "sub");
     }
 
     const selected = this.repository.getSelectedElements();
@@ -1545,13 +2342,15 @@ export class RDDraw implements CommandHost {
       }
     });
     this.drawLineHandles(lineHandleTargets);
+    this.drawLoopHandles(this.activeLoop());
 
     this.drawContext.closePath();
 
     if (this.selectionRect) {
       const scale = config.scale;
-      const left = Math.min(this.selectionRect.x1, this.selectionRect.x2) * scale;
-      const top = Math.min(this.selectionRect.y1, this.selectionRect.y2) * scale;
+      const offset = this.drawContext.getViewOffset();
+      const left = (Math.min(this.selectionRect.x1, this.selectionRect.x2) + offset.x) * scale;
+      const top = (Math.min(this.selectionRect.y1, this.selectionRect.y2) + offset.y) * scale;
       const width = Math.abs(this.selectionRect.x2 - this.selectionRect.x1) * scale;
       const height = Math.abs(this.selectionRect.y2 - this.selectionRect.y1) * scale;
       this.context.save();
@@ -1979,32 +2778,337 @@ export class RDDraw implements CommandHost {
   }
 
   copy() {
-    let elem = this.repository.currentElement();
-    if (elem == undefined) {
+    this.copySelection();
+  }
+
+  private setDslStatus(message: string, type: "neutral" | "ok" | "error" = "neutral") {
+    if (!this.dslStatusElement) {
       return;
     }
-    let copied = elem.copy();
-    copied.move(new Vector(0.1, 0.1));
-    if (isLine(copied)) {
-      this.repository.doCommand(new SetLine(copied));
+    this.dslStatusElement.textContent = message;
+    this.dslStatusElement.classList.remove("text-secondary", "text-success", "text-danger");
+    if (type === "ok") {
+      this.dslStatusElement.classList.add("text-success");
+      return;
+    }
+    if (type === "error") {
+      this.dslStatusElement.classList.add("text-danger");
+      return;
+    }
+    this.dslStatusElement.classList.add("text-secondary");
+  }
+
+  private appendDslLog(text: string, kind: "ok" | "error" | "info" = "info") {
+    if (!this.dslLogElement) {
+      return;
+    }
+    const stamp = new Date().toLocaleTimeString();
+    const prefix = kind === "ok" ? "OK" : kind === "error" ? "ERR" : "INFO";
+    const line = `[${stamp}] ${prefix} ${text}`;
+    const previous = this.dslLogElement.textContent;
+    if (!previous || previous === "Execution log is empty.") {
+      this.dslLogElement.textContent = line;
+      return;
+    }
+    this.dslLogElement.textContent = `${line}\n${previous}`;
+  }
+
+  private openSelectionMacroEditor() {
+    const selected = this.repository.getSelectedElements();
+    if (selected.length === 0) {
+      this.selectionMacroEditMode = false;
+      this.setDslStatus("Select elements before editing as macro.", "neutral");
+      return;
+    }
+
+    const script = this.buildSelectionMacroScript(selected);
+    if (!script) {
+      this.selectionMacroEditMode = false;
+      this.setDslStatus("Selection contains no macro-exportable geometry.", "error");
+      return;
+    }
+
+    if (this.dslScriptElement) {
+      this.dslScriptElement.value = script;
+      this.dslScriptElement.focus();
+      this.dslScriptElement.setSelectionRange(0, this.dslScriptElement.value.length);
+    }
+    this.selectionMacroEditMode = true;
+    this.setDslStatus("Selection macro loaded. Edit and run script to replace selection.", "ok");
+    this.appendDslLog("Selection macro exported to script editor.", "info");
+  }
+
+  private buildSelectionMacroScript(selected: Elem[]): string | null {
+    const lines = selected.filter((elem): elem is Line => isLine(elem));
+    const loops = selected.filter((elem): elem is Loop => isLoop(elem));
+    if (lines.length === 0 && loops.length === 0) {
+      return null;
+    }
+
+    const commands: string[] = [
+      "# Selection macro (editable)",
+      "# Run Script will replace current selection with this script output.",
+      "# line x1 y1 x2 y2 [style]",
+      "# loop x y radius [style] [beginAngle] [endAngle]",
+    ];
+    const format = (value: number) => Number(value.toFixed(3)).toString();
+
+    lines
+      .slice()
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .forEach((line) => {
+        commands.push(
+          `line ${format(line.origin.x)} ${format(line.origin.y)} ${format(line.to.x)} ${format(line.to.y)} ${line.style}`
+        );
+      });
+
+    loops
+      .slice()
+      .sort((a, b) => Number(a.id) - Number(b.id))
+      .forEach((loop) => {
+        commands.push(
+          `loop ${format(loop.origin.x)} ${format(loop.origin.y)} ${format(loop.radius)} ${loop.style} ${format(loop.loopBeginAngle)} ${format(loop.loopEndAngle)}`
+        );
+      });
+
+    return commands.join("\n");
+  }
+
+  private applySelectionMacroScript(script: string): boolean {
+    const selected = this.repository.getSelectedElements();
+    if (selected.length === 0) {
+      this.selectionMacroEditMode = false;
+      this.setDslStatus("Macro edit mode ended because selection was cleared.", "neutral");
+      return false;
+    }
+    const text = script.trim();
+    if (!text) {
+      this.setDslStatus("Script is empty.", "error");
+      return false;
+    }
+
+    const historyHeadBefore = this.repository.historyHead;
+    const idsBefore = new Set(this.repository.getAllElements().map((elem) => elem.id));
+
+    if (selected.length === 1) {
+      this.repository.doCommand(new Delete(selected[0]));
+    } else {
+      this.repository.doCommand(new DeleteGroup(selected));
+    }
+    this.repository.clearSelectMode();
+
+    const batch = this.scriptEngine.executeScript(text, true);
+    if (!batch.success) {
+      while (this.repository.historyHead > historyHeadBefore) {
+        this.repository.undo();
+      }
       this.drawAll();
+      this.setDslStatus(batch.message, "error");
+      this.appendDslLog(batch.message, "error");
+      return false;
+    }
+
+    const inserted = this.repository.getAllElements().filter((elem) => !idsBefore.has(elem.id));
+    if (inserted.length > 0) {
+      this.repository.setSelection(inserted);
+    }
+    this.drawAll();
+    return true;
+  }
+
+  cutSelection() {
+    const selected = this.repository.getSelectedElements();
+    if (selected.length === 0) {
       return;
     }
-    if (isLoop(copied)) {
-      this.repository.doCommand(new SetLoop(copied));
-      this.drawAll();
+    this.copySelection();
+    this.delete();
+  }
+
+  groupSelection() {
+    const selected = this.repository.getSelectedElements();
+    if (selected.length < 2) {
       return;
     }
-    if (isString(copied)) {
-      this.repository.doCommand(new SetString(copied));
-      this.drawAll();
+    this.repository.doCommand(new GroupSelection(selected));
+    this.drawAll();
+  }
+
+  ungroupSelection() {
+    const selected = this.repository.getSelectedElements();
+    if (selected.length !== 1 || !isGroup(selected[0])) {
       return;
     }
-    if (isVector(copied)) {
-      this.repository.doCommand(new SetVertex(copied));
-      this.drawAll();
+    this.repository.doCommand(new UngroupSelection(selected[0] as Group));
+    this.drawAll();
+  }
+
+  copySelection() {
+    const selectedRaw = this.repository.getSelectedElements();
+    const selected = selectedRaw.length > 0
+      ? selectedRaw
+      : (this.repository.currentElement() ? [this.repository.currentElement() as Elem] : []);
+    if (selected.length === 0) {
       return;
     }
+
+    const vertexMap = new Map<string, Vertex>();
+    const lines: Array<{
+      startId: string;
+      endId: string;
+      style: Line["style"];
+      label: string;
+      labelDiff: number;
+      allow: Boolean;
+      arrowRotation: number;
+      control: Vector | null;
+    }> = [];
+    const loops: Array<{
+      centerId: string;
+      radius: number;
+      style: Loop["style"];
+      allow: Boolean;
+      fill: boolean;
+      label: string;
+      loopBeginAngle: number;
+      loopEndAngle: number;
+    }> = [];
+    const strings: Array<{ x: number; y: number; label: string }> = [];
+
+    const ensureVertex = (vertex: Vertex | Vector) => {
+      if (!vertexMap.has(vertex.id)) {
+        vertexMap.set(vertex.id, new Vertex(vertex.x, vertex.y));
+      }
+    };
+
+    const flatten = (elem: Elem): Elem[] => {
+      if (!isGroup(elem)) {
+        return [elem];
+      }
+      return elem.elements.flatMap((child) => flatten(child));
+    };
+
+    selected.flatMap((elem) => flatten(elem)).forEach((elem) => {
+      if (isVector(elem)) {
+        ensureVertex(elem);
+        return;
+      }
+      if (isLine(elem)) {
+        ensureVertex(elem.origin);
+        ensureVertex(elem.to);
+        lines.push({
+          startId: elem.origin.id,
+          endId: elem.to.id,
+          style: elem.style,
+          label: elem.label,
+          labelDiff: elem.labelDiff,
+          allow: elem.allow,
+          arrowRotation: elem.arrowRotation ?? 0,
+          control: elem.control ? elem.control.copy() : null,
+        });
+        return;
+      }
+      if (isLoop(elem)) {
+        ensureVertex(elem.origin);
+        loops.push({
+          centerId: elem.origin.id,
+          radius: elem.radius,
+          style: elem.style,
+          allow: elem.allow,
+          fill: elem.fill,
+          label: elem.label,
+          loopBeginAngle: elem.loopBeginAngle,
+          loopEndAngle: elem.loopEndAngle,
+        });
+        return;
+      }
+      if (isString(elem)) {
+        strings.push({ x: elem.origin.x, y: elem.origin.y, label: elem.label });
+      }
+    });
+
+    this.clipboardSnapshot = {
+      vertices: Array.from(vertexMap.entries()).map(([id, vertex]) => ({
+        id,
+        x: vertex.x,
+        y: vertex.y,
+      })),
+      lines,
+      loops,
+      strings,
+    };
+  }
+
+  pasteSelection() {
+    const snapshot = this.clipboardSnapshot;
+    if (!snapshot) {
+      return;
+    }
+    const offset = new Vector(1.2, 1.2);
+    const idMap = new Map<string, Vertex>();
+
+    snapshot.vertices.forEach((data) => {
+      const vertex = new Vertex(data.x + offset.x, data.y + offset.y);
+      this.repository.doCommand(new SetVertex(vertex));
+      const created = this.repository.currentElement();
+      if (created && isVector(created)) {
+        idMap.set(data.id, created as Vertex);
+      } else {
+        idMap.set(data.id, vertex);
+      }
+    });
+
+    snapshot.lines.forEach((data) => {
+      const start = idMap.get(data.startId);
+      const end = idMap.get(data.endId);
+      if (!start || !end) {
+        return;
+      }
+      const line = new Line();
+      line.style = data.style;
+      line.label = data.label;
+      line.labelDiff = data.labelDiff;
+      line.allow = data.allow;
+      line.arrowRotation = data.arrowRotation;
+      line.control = data.control ? data.control.add(offset) : null;
+      line.origin = start;
+      line.to = end;
+      this.repository.doCommand(new SetLine(line));
+    });
+
+    snapshot.loops.forEach((data) => {
+      const center = idMap.get(data.centerId);
+      if (!center) {
+        return;
+      }
+      const loop = new Loop();
+      loop.origin = center;
+      loop.setRadius(data.radius);
+      loop.style = data.style;
+      loop.allow = data.allow;
+      loop.fill = data.fill;
+      loop.label = data.label;
+      loop.loopBeginAngle = data.loopBeginAngle;
+      loop.loopEndAngle = data.loopEndAngle;
+      this.repository.doCommand(new SetLoop(loop));
+    });
+
+    snapshot.strings.forEach((data) => {
+      const str = new MyString(data.label);
+      str.origin = new Vector(data.x + offset.x, data.y + offset.y);
+      this.repository.doCommand(new SetString(str));
+    });
+
+    this.drawAll();
+  }
+
+  selectAll() {
+    const all = this.repository.getAllElements();
+    if (all.length === 0) {
+      return;
+    }
+    this.repository.setSelection(all);
+    this.drawAll();
   }
 
   rotation() {

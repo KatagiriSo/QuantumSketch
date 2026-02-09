@@ -8,6 +8,19 @@ from typing import Iterable
 DEFAULT_EXTS = (".ts", ".tsx")
 
 
+def uniq_existing_files(paths: Iterable[Path]) -> list[Path]:
+    unique: dict[Path, Path] = {}
+    for p in paths:
+        try:
+            rp = p.resolve()
+        except FileNotFoundError:
+            continue
+        if not rp.exists() or not rp.is_file():
+            continue
+        unique[rp] = p
+    return list(unique.values())
+
+
 def iter_source_files(src_dir: Path, exts: Iterable[str], out_file: Path) -> list[Path]:
     exts_lc = tuple(e.lower() for e in exts)
 
@@ -50,8 +63,34 @@ def read_text(path: Path) -> str:
     return path.read_text(encoding="utf-8", errors="replace")
 
 
-def write_all_in_one(root_dir: Path, src_dir: Path, out_file: Path, exts: Iterable[str]) -> None:
+def write_all_in_one(
+    root_dir: Path,
+    src_dir: Path,
+    out_file: Path,
+    exts: Iterable[str],
+    include_files: Iterable[Path] = (),
+) -> None:
     files = iter_source_files(src_dir, exts, out_file)
+
+    # Append extra files (e.g. docs/index.html). These are included as-is,
+    # regardless of extension filtering.
+    extra_files = uniq_existing_files(include_files)
+    if extra_files:
+        out_resolved = None
+        try:
+            out_resolved = out_file.resolve()
+        except FileNotFoundError:
+            pass
+        for p in extra_files:
+            try:
+                if out_resolved is not None and p.resolve() == out_resolved:
+                    continue
+            except FileNotFoundError:
+                continue
+            files.append(p)
+
+        # keep deterministic ordering
+        files = sorted({f.resolve(): f for f in files}.values(), key=lambda x: x.as_posix().lower())
 
     parts: list[str] = []
     parts.append(
@@ -83,6 +122,7 @@ def main() -> None:
     root_dir = script_dir.parent  # repo root想定: .../RDFeynmann
     default_src = root_dir / "src"
     default_out = root_dir / "scripts" / "output" / "allinOne.tsx"
+    default_include = root_dir / "docs" / "index.html"
 
     parser = argparse.ArgumentParser(
         description="Merge src/**/*.ts(x) into one allinOne.tsx with file path markers."
@@ -95,16 +135,34 @@ def main() -> None:
         help="Output file (default: <repo>/scripts/output/allinOne.tsx)",
     )
     parser.add_argument("--ext", action="append", default=[], help="Include extension (repeatable). default: .ts .tsx")
+    parser.add_argument(
+        "--include",
+        action="append",
+        type=Path,
+        default=[],
+        help="Extra file to include (repeatable). Default includes: docs/index.html (if exists)",
+    )
     args = parser.parse_args()
 
     src_dir: Path = args.src.resolve()
     out_file: Path = args.out.resolve()
     exts = tuple(args.ext) if args.ext else DEFAULT_EXTS
 
+    include_files: list[Path] = []
+    if default_include.exists() and default_include.is_file():
+        include_files.append(default_include)
+    include_files.extend(args.include)
+
     if not src_dir.exists() or not src_dir.is_dir():
         raise SystemExit(f"src dir not found: {src_dir}")
 
-    write_all_in_one(root_dir=root_dir, src_dir=src_dir, out_file=out_file, exts=exts)
+    write_all_in_one(
+        root_dir=root_dir,
+        src_dir=src_dir,
+        out_file=out_file,
+        exts=exts,
+        include_files=include_files,
+    )
 
 
 if __name__ == "__main__":

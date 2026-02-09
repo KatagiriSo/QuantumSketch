@@ -3,12 +3,10 @@ import { LabelInfo } from "./LabelInfo";
 import { LineStyle, Line } from "./Line";
 import { Shape } from "./Shape";
 import { Vector, direction, makeVector } from "./Vector";
+import { Vertex } from "./Vertex";
 
 /**
- * A Loop is a Line that is a loop.
- * It has a radius, and a begin and end angle.
- * It can be copied, and it can be saved to a JSON object.
- * It can also be described as a string.
+ * Loop bound to a center vertex (graph node).
  */
 export class Loop implements Elem {
   id: string;
@@ -16,44 +14,15 @@ export class Loop implements Elem {
   style: LineStyle = "normal";
   allow: Boolean = false;
   fill: boolean = false;
-  origin: Vector = new Vector(0, 0);
   radius: number = 1;
   label: string = "";
   labels: LabelInfo[] = [];
   loopBeginAngle: number = 0;
   loopEndAngle: number = Math.PI * 2;
 
-  save(): any {
-    let saveData = {} as any;
-    saveData["id"] = this.id;
-    saveData["label"] = this.label;
-    saveData["labels"] = this.labels;
-
-    saveData["shape"] = this.shape;
-    saveData["style"] = this.style;
-    saveData["allow"] = this.allow;
-    saveData["fill"] = this.fill;
-
-    saveData["origin"] = this.origin.save();
-    saveData["radius"] = this.radius;
-    saveData["loopBeginAngle"] = this.loopBeginAngle;
-    saveData["loopEndAngle"] = this.loopEndAngle;
-
-    return saveData;
-  }
-
-  copy(): Loop {
-    let loop = new Loop();
-    loop.fill = this.fill;
-    loop.origin = this.origin;
-    loop.radius = this.radius;
-    loop.label = this.label;
-    loop.labels = this.labels;
-    loop.style = this.style;
-    loop.loopBeginAngle = this.loopBeginAngle;
-    loop.loopEndAngle = this.loopEndAngle;
-    return loop;
-  }
+  centerVertexId: string = "";
+  private centerVertex?: Vertex;
+  private fallbackOrigin: Vector = new Vector(0, 0);
 
   constructor(label?: string, origin?: Vector) {
     this.id = getElemID();
@@ -65,15 +34,79 @@ export class Loop implements Elem {
     }
   }
 
+  get origin(): Vertex {
+    if (this.centerVertex) {
+      return this.centerVertex;
+    }
+    const detached = new Vertex(this.fallbackOrigin.x, this.fallbackOrigin.y);
+    detached.id = this.centerVertexId || detached.id;
+    this.centerVertex = detached;
+    this.centerVertexId = detached.id;
+    return detached;
+  }
+
+  set origin(value: Vector) {
+    if (value instanceof Vertex) {
+      this.centerVertex = value;
+      this.centerVertexId = value.id;
+      this.fallbackOrigin = value.copy();
+      return;
+    }
+    const detached = new Vertex(value.x, value.y);
+    this.centerVertex = detached;
+    this.centerVertexId = detached.id;
+    this.fallbackOrigin = detached.copy();
+  }
+
+  bindCenterVertex(vertex: Vertex): void {
+    this.centerVertex = vertex;
+    this.centerVertexId = vertex.id;
+    this.fallbackOrigin = vertex.copy();
+  }
+
+  save(): any {
+    const saveData = {} as any;
+    saveData["id"] = this.id;
+    saveData["label"] = this.label;
+    saveData["labels"] = this.labels;
+    saveData["shape"] = this.shape;
+    saveData["style"] = this.style;
+    saveData["allow"] = this.allow;
+    saveData["fill"] = this.fill;
+    saveData["origin"] = this.origin.save();
+    saveData["radius"] = this.radius;
+    saveData["loopBeginAngle"] = this.loopBeginAngle;
+    saveData["loopEndAngle"] = this.loopEndAngle;
+    saveData["centerVertexId"] = this.centerVertexId;
+    return saveData;
+  }
+
+  copy(): Loop {
+    const loop = new Loop();
+    loop.id = this.id;
+    loop.fill = this.fill;
+    loop.radius = this.radius;
+    loop.label = this.label;
+    loop.labels = [...this.labels];
+    loop.style = this.style;
+    loop.allow = this.allow;
+    loop.loopBeginAngle = this.loopBeginAngle;
+    loop.loopEndAngle = this.loopEndAngle;
+    loop.centerVertexId = this.centerVertexId;
+    loop.centerVertex = this.centerVertex;
+    loop.fallbackOrigin = this.fallbackOrigin.copy();
+    return loop;
+  }
+
   setLoopBeginAngle(angle: number): void {
     if (angle >= 2 * Math.PI) angle -= 2 * Math.PI;
-    if (angle < 0.0         ) angle += 2 * Math.PI;
+    if (angle < 0.0) angle += 2 * Math.PI;
     this.loopBeginAngle = angle;
   }
 
   setLoopEndAngle(angle: number): void {
     if (angle >= 2 * Math.PI) angle -= 2 * Math.PI;
-    if (angle < 0           ) angle += 2 * Math.PI;
+    if (angle < 0) angle += 2 * Math.PI;
     this.loopEndAngle = angle;
   }
 
@@ -83,11 +116,11 @@ export class Loop implements Elem {
   }
 
   move(delta: Vector): void {
-    this.origin = this.origin.add(delta);
+    this.origin.move(delta);
   }
 
   moveAbsolute(location: Vector): void {
-    this.origin = location;
+    this.origin.moveAbsolute(location);
   }
 
   rotation(delta: number): void {
@@ -95,24 +128,20 @@ export class Loop implements Elem {
     this.setLoopEndAngle(this.loopEndAngle + delta);
   }
 
-  addLineTo(line: Line) {
-    line.to = this.origin.add(
-      direction(line.origin, this.origin).unit().multi(this.radius)
-    );
+  addLineTo(line: Line): void {
+    line.to = this.origin.add(direction(line.origin, this.origin).unit().multi(this.radius));
   }
-  addLineOrigin(line: Line) {
-    line.origin = this.origin.add(
-      direction(line.to, this.origin).unit().multi(this.radius)
-    );
+
+  addLineOrigin(line: Line): void {
+    line.origin = this.origin.add(direction(line.to, this.origin).unit().multi(this.radius));
   }
-  addLoop(loop: Loop) {
-    loop.origin = this.origin.add(
-      direction(loop.origin, this.origin).unit().multi(this.radius)
-    )
+
+  addLoop(loop: Loop): void {
+    loop.origin = this.origin.add(direction(loop.origin, this.origin).unit().multi(this.radius));
   }
 
   formalDistance(point: Vector): number {
-    let length = this.origin.minus(point).length();
+    const length = this.origin.minus(point).length();
     if (length < this.radius) {
       return 0;
     }
@@ -120,11 +149,7 @@ export class Loop implements Elem {
   }
 
   description(): string {
-    return `${this.shape} id:${this.id} (${this.origin.x},${
-      this.origin.y
-    }) radius = ${this.radius} angle = (${
-      this.loopBeginAngle * (360 / (2 * Math.PI))
-    }, ${this.loopEndAngle * (360 / (2 * Math.PI))}) stayle:${this.style}`;
+    return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) radius = ${this.radius} angle = (${this.loopBeginAngle * (360 / (2 * Math.PI))}, ${this.loopEndAngle * (360 / (2 * Math.PI))}) style:${this.style}`;
   }
 }
 
@@ -134,17 +159,25 @@ export function isLoop(elem: Elem): elem is Loop {
 
 export function makeLoop(data: any): Loop | undefined {
   const shape = data["shape"] as Shape | undefined;
-  if (shape) {
+  if (shape && shape !== "Loop") {
     return undefined;
   }
-  const elm = new Loop(undefined, undefined);
-  elm.id = data["id"];
-  elm.label = data["label"];
-  elm.style = data["style"];
-  elm.allow = data["allow"];
-  elm.fill = data["fill"];
-  elm.origin = makeVector(data["origin"]) ?? new Vector(0, 0);
-  elm.loopBeginAngle = data["loopBeginAngle"];
-  elm.loopEndAngle = data["loopEndAngle"];
-  return elm;
+  const loop = new Loop(undefined, undefined);
+  loop.id = data["id"] ?? loop.id;
+  loop.label = data["label"] ?? "";
+  loop.style = data["style"] ?? "normal";
+  loop.allow = data["allow"] ?? false;
+  loop.fill = data["fill"] ?? false;
+  loop.radius = data["radius"] ?? 1;
+  loop.loopBeginAngle = data["loopBeginAngle"] ?? 0;
+  loop.loopEndAngle = data["loopEndAngle"] ?? Math.PI * 2;
+  const centerId = data["centerVertexId"];
+  if (typeof centerId === "string") {
+    loop.centerVertexId = centerId;
+  }
+  const origin = makeVector(data["origin"]);
+  if (origin) {
+    loop.origin = new Vertex(origin.x, origin.y);
+  }
+  return loop;
 }

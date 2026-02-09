@@ -8,7 +8,7 @@
     "watch": "webpack -w",
     "test": "node ./test.ts",
     "clean": "rm -f ./dist/*.js",
-    "gen:allinone": "python3 scripts/foldersToOne.py"
+    "gen:allinone": "python3 scripts/foldersToOne.py --include docs/index.html"
   },
   "author": "KatagiriSo",
   "license": "MIT",

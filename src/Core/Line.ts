@@ -1,17 +1,13 @@
 import { Elem, getElemID } from "./Elem";
 import { Loop } from "./Loop";
 import { Shape } from "./Shape";
-import { makeVector, Vector } from "./Vector";
+import { Vector } from "./Vector";
+import { Vertex } from "./Vertex";
 
-export type LineStyle = "normal" | "dash" | "wave" | "coil" | "double"; //
-// wave https://stackoverflow.com/questions/29917446/drawing-sine-wave-in-canvas
+export type LineStyle = "normal" | "dash" | "wave" | "coil" | "double";
 
 /**
- * A Line is a Elem that is a line.
- * It has a label, a style, and a labelDiff.
- * It can be rotated, and it can be toggled.
- * It can be copied, and it can be saved to a JSON object.
- * It can also be described as a string.
+ * Graph edge. Geometry is resolved from vertex references.
  */
 export class Line implements Elem {
   id: string;
@@ -20,36 +16,16 @@ export class Line implements Elem {
   style: LineStyle = "normal";
   labelDiff: number = 0;
   allow: Boolean = true;
-  origin: Vector = new Vector(0, 0);
-  to: Vector = new Vector(0, 0);
   control: Vector | null = null;
   arrowRotation: number = 0;
 
-  save(): any {
-    let saveData = {} as any
-    saveData["id"] = this.id
-    saveData["label"] = this.label
-    saveData["style"] = this.style;
-    saveData["allow"] = this.allow;
-    saveData["origin"] = this.origin.save();
-    saveData["to"] = this.to.save();
-    saveData["control"] = this.control ? this.control.save() : null;
-    saveData["arrowRotation"] = this.arrowRotation;
-    return saveData
-  }
+  startVertexId: string = "";
+  endVertexId: string = "";
 
-  copy(): Line {
-    let line = new Line();
-    line.label = this.label;
-    line.style = this.style;
-    line.labelDiff = line.labelDiff;
-    line.allow = this.allow;
-    line.origin = this.origin.copy();
-    line.to = this.to.copy();
-    line.control = this.control ? this.control.copy() : null;
-    line.arrowRotation = this.arrowRotation;
-    return line;
-  }
+  private startVertex?: Vertex;
+  private endVertex?: Vertex;
+  private fallbackOrigin: Vector = new Vector(0, 0);
+  private fallbackTo: Vector = new Vector(0, 0);
 
   constructor(label?: string, style?: LineStyle) {
     this.id = getElemID();
@@ -61,35 +37,140 @@ export class Line implements Elem {
     }
   }
 
-  rotation(angle: number) {
-    let centerOrigin = this.center();
-    let unitVec = this.directionUnit();
-    let length = this.length();
-    let rotatedUnitVec = unitVec.rotation(angle);
-    this.origin = centerOrigin.add(rotatedUnitVec.multi(-length / 2));
-    this.to = centerOrigin.add(rotatedUnitVec.multi(length / 2));
+  save(): any {
+    const saveData = {} as any;
+    saveData["id"] = this.id;
+    saveData["shape"] = this.shape;
+    saveData["label"] = this.label;
+    saveData["style"] = this.style;
+    saveData["allow"] = this.allow;
+    saveData["labelDiff"] = this.labelDiff;
+    saveData["arrowRotation"] = this.arrowRotation;
+    saveData["control"] = this.control ? this.control.save() : null;
+    saveData["startVertexId"] = this.startVertexId;
+    saveData["endVertexId"] = this.endVertexId;
+    saveData["origin"] = this.origin.save();
+    saveData["to"] = this.to.save();
+    return saveData;
+  }
+
+  copy(): Line {
+    const line = new Line();
+    line.id = this.id;
+    line.label = this.label;
+    line.style = this.style;
+    line.labelDiff = this.labelDiff;
+    line.allow = this.allow;
+    line.control = this.control ? this.control.copy() : null;
+    line.arrowRotation = this.arrowRotation;
+    line.startVertexId = this.startVertexId;
+    line.endVertexId = this.endVertexId;
+    line.startVertex = this.startVertex;
+    line.endVertex = this.endVertex;
+    line.fallbackOrigin = this.fallbackOrigin.copy();
+    line.fallbackTo = this.fallbackTo.copy();
+    return line;
+  }
+
+  bindVertices(start: Vertex, end: Vertex): void {
+    this.startVertex = start;
+    this.endVertex = end;
+    this.startVertexId = start.id;
+    this.endVertexId = end.id;
+    this.fallbackOrigin = start.copy();
+    this.fallbackTo = end.copy();
+  }
+
+  bindStartVertex(start: Vertex): void {
+    this.startVertex = start;
+    this.startVertexId = start.id;
+    this.fallbackOrigin = start.copy();
+  }
+
+  bindEndVertex(end: Vertex): void {
+    this.endVertex = end;
+    this.endVertexId = end.id;
+    this.fallbackTo = end.copy();
+  }
+
+  resolveVertices(start?: Vertex, end?: Vertex): void {
+    if (start) {
+      this.bindStartVertex(start);
+    }
+    if (end) {
+      this.bindEndVertex(end);
+    }
+  }
+
+  get origin(): Vertex {
+    if (this.startVertex) {
+      return this.startVertex;
+    }
+    const detached = new Vertex(this.fallbackOrigin.x, this.fallbackOrigin.y);
+    detached.id = this.startVertexId || detached.id;
+    this.startVertex = detached;
+    this.startVertexId = detached.id;
+    return detached;
+  }
+
+  set origin(value: Vector) {
+    if (value instanceof Vertex) {
+      this.bindStartVertex(value);
+      return;
+    }
+    const detached = new Vertex(value.x, value.y);
+    this.bindStartVertex(detached);
+  }
+
+  get to(): Vertex {
+    if (this.endVertex) {
+      return this.endVertex;
+    }
+    const detached = new Vertex(this.fallbackTo.x, this.fallbackTo.y);
+    detached.id = this.endVertexId || detached.id;
+    this.endVertex = detached;
+    this.endVertexId = detached.id;
+    return detached;
+  }
+
+  set to(value: Vector) {
+    if (value instanceof Vertex) {
+      this.bindEndVertex(value);
+      return;
+    }
+    const detached = new Vertex(value.x, value.y);
+    this.bindEndVertex(detached);
+  }
+
+  rotation(angle: number): void {
+    const center = this.center();
+    const unit = this.directionUnit();
+    const length = this.length();
+    const rotated = unit.rotation(angle);
+    this.origin.moveAbsolute(center.add(rotated.multi(-length / 2)));
+    this.to.moveAbsolute(center.add(rotated.multi(length / 2)));
   }
 
   move(delta: Vector): void {
-    this.origin = this.origin.add(delta);
-    this.to = this.to.add(delta);
+    this.origin.move(delta);
+    this.to.move(delta);
   }
 
   moveAbsolute(location: Vector): void {
     const length = this.length();
-    const unitVec = this.directionUnit();
-    this.origin = location.add(unitVec.multi(-length / 2));
-    this.to = location.add(unitVec.multi(+length / 2));
+    const unit = this.directionUnit();
+    this.origin.moveAbsolute(location.add(unit.multi(-length / 2)));
+    this.to.moveAbsolute(location.add(unit.multi(length / 2)));
   }
 
   length(): number {
     return this.to.minus(this.origin).length();
   }
 
-  toggle() {
-    let o = this.origin;
-    this.origin = this.to;
-    this.to = o;
+  toggle(): void {
+    const start = this.origin;
+    const end = this.to;
+    this.bindVertices(end, start);
   }
 
   direction(): Vector {
@@ -97,18 +178,22 @@ export class Line implements Elem {
   }
 
   directionUnit(): Vector {
-    return this.direction().multi(1 / this.length());
+    const length = this.length();
+    if (length === 0) {
+      return new Vector(1, 0);
+    }
+    return this.direction().multi(1 / length);
   }
 
-  addLoopOrigin(loop: Loop) {
+  addLoopOrigin(loop: Loop): void {
     loop.origin = this.origin.minus(this.directionUnit().multi(loop.radius));
   }
 
-  addLoopTo(loop: Loop) {
+  addLoopTo(loop: Loop): void {
     loop.origin = this.to.add(this.directionUnit().multi(loop.radius));
   }
 
-  between(loop1: Loop, loop2: Loop) {
+  between(loop1: Loop, loop2: Loop): void {
     this.to = loop1.origin.copy();
     this.origin = loop2.origin.copy();
     loop1.addLineTo(this);
@@ -119,25 +204,12 @@ export class Line implements Elem {
     if (this.control) {
       return this.pointAt(0.5);
     }
-    return this.origin.add(this.to).multi(1 / 2);
+    return this.origin.add(this.to).multi(0.5);
   }
 
   formalDistance(point: Vector): number {
     const closest = this.closestPoint(point);
     return point.minus(closest).length();
-
-    // let toLength = this.to.minus(point).length()
-    // let originLength = this.origin.minus(point).length()
-    // if (toLength < originLength) {
-    //     if (toLength > 2) {
-    //         return toLength
-    //     }
-    //     return toLength + 1
-    // }
-    // if (originLength > 2) {
-    //     return originLength
-    // }
-    // return originLength + 1
   }
 
   vector(): Vector {
@@ -145,7 +217,7 @@ export class Line implements Elem {
   }
 
   description(): string {
-    return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) -> (${this.to.x}, ${this.to.y}) stayle:${this.style}`;
+    return `${this.shape} id:${this.id} (${this.origin.x},${this.origin.y}) -> (${this.to.x}, ${this.to.y}) style:${this.style}`;
   }
 
   closestPoint(point: Vector): Vector {
@@ -155,21 +227,11 @@ export class Line implements Elem {
       if (lengthSquared === 0) {
         return this.origin.copy();
       }
-      const t = Math.max(
-        0,
-        Math.min(
-          1,
-          point
-            .minus(this.origin)
-            .prod(direction) / lengthSquared
-        )
-      );
-      return new Vector(
-        this.origin.x + direction.x * t,
-        this.origin.y + direction.y * t
-      );
+      const t = Math.max(0, Math.min(1, point.minus(this.origin).prod(direction) / lengthSquared));
+      return new Vector(this.origin.x + direction.x * t, this.origin.y + direction.y * t);
     }
-    let closest = this.origin.copy();
+
+    let closest: Vector = this.origin.copy();
     let minDistance = Number.POSITIVE_INFINITY;
     const segments = 64;
     for (let i = 0; i <= segments; i++) {
@@ -185,22 +247,22 @@ export class Line implements Elem {
   }
 
   pointAt(t: number): Vector {
-    t = Math.max(0, Math.min(1, t));
+    const clamped = Math.max(0, Math.min(1, t));
     if (this.control) {
-      const oneMinusT = 1 - t;
+      const oneMinusT = 1 - clamped;
       const term1 = this.origin.multi(oneMinusT * oneMinusT);
-      const term2 = this.control.multi(2 * oneMinusT * t);
-      const term3 = this.to.multi(t * t);
+      const term2 = this.control.multi(2 * oneMinusT * clamped);
+      const term3 = this.to.multi(clamped * clamped);
       return term1.add(term2).add(term3);
     }
-    return this.origin.add(this.direction().multi(t));
+    return this.origin.add(this.direction().multi(clamped));
   }
 
   tangentAt(t: number): Vector {
-    t = Math.max(0, Math.min(1, t));
+    const clamped = Math.max(0, Math.min(1, t));
     if (this.control) {
-      const term1 = this.control.minus(this.origin).multi(2 * (1 - t));
-      const term2 = this.to.minus(this.control).multi(2 * t);
+      const term1 = this.control.minus(this.origin).multi(2 * (1 - clamped));
+      const term2 = this.to.minus(this.control).multi(2 * clamped);
       return term1.add(term2);
     }
     return this.direction();
@@ -213,21 +275,36 @@ export function isLine(elem: Elem): elem is Line {
 
 export function makeLine(data: any): Line | undefined {
   const shape = data["shape"] as Shape | undefined;
-  if (shape) {
+  if (shape && shape !== "Line") {
     return undefined;
   }
-  const elm = new Line(undefined, undefined);
-  elm.id = data["id"];
-  elm.label = data["label"];
-  elm.style = data["style"];
-  elm.allow = data["allow"];
-  elm.labelDiff = data["labelDiff"];
-  elm.origin = makeVector(data["origin"]) ?? new Vector(0, 0);
-  elm.to = makeVector(data["to"]) ?? new Vector(0, 0);
-  const control = makeVector(data["control"]);
-  elm.control = control ?? null;
-  const arrowRotation = data["arrowRotation"];
-  elm.arrowRotation = typeof arrowRotation === "number" ? arrowRotation : 0;
 
-  return elm;
+  const line = new Line();
+  line.id = data["id"] ?? line.id;
+  line.label = data["label"] ?? "";
+  line.style = data["style"] ?? "normal";
+  line.allow = data["allow"] ?? true;
+  line.labelDiff = data["labelDiff"] ?? 0;
+  line.arrowRotation = typeof data["arrowRotation"] === "number" ? data["arrowRotation"] : 0;
+
+  const origin = data["origin"];
+  const to = data["to"];
+  if (origin && typeof origin.x === "number" && typeof origin.y === "number") {
+    line.origin = new Vertex(origin.x, origin.y);
+  }
+  if (to && typeof to.x === "number" && typeof to.y === "number") {
+    line.to = new Vertex(to.x, to.y);
+  }
+
+  line.startVertexId = data["startVertexId"] ?? line.startVertexId;
+  line.endVertexId = data["endVertexId"] ?? line.endVertexId;
+
+  const control = data["control"];
+  if (control && typeof control.x === "number" && typeof control.y === "number") {
+    line.control = new Vector(control.x, control.y);
+  } else {
+    line.control = null;
+  }
+
+  return line;
 }
