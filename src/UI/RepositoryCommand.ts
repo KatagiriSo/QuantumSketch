@@ -553,6 +553,106 @@ export class ChangeStyle implements RepositoryCommand {
   }
 }
 
+export class SetLineStyle implements RepositoryCommand {
+  target: Line;
+  before: LineStyle;
+  after: LineStyle;
+
+  constructor(target: Line, after: LineStyle) {
+    this.target = target;
+    this.before = target.style;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.style = this.after;
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.style = this.before;
+  }
+}
+
+export class SetLoopStyle implements RepositoryCommand {
+  target: Loop;
+  before: LineStyle;
+  after: LineStyle;
+
+  constructor(target: Loop, after: LineStyle) {
+    this.target = target;
+    this.before = target.style;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.style = this.after;
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.style = this.before;
+  }
+}
+
+export class SetLineLabel implements RepositoryCommand {
+  target: Line;
+  before: string;
+  after: string;
+
+  constructor(target: Line, after: string) {
+    this.target = target;
+    this.before = target.label;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.label = this.after;
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.label = this.before;
+  }
+}
+
+export class SetLoopLabel implements RepositoryCommand {
+  target: Loop;
+  before: string;
+  after: string;
+
+  constructor(target: Loop, after: string) {
+    this.target = target;
+    this.before = target.label;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.label = this.after;
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.label = this.before;
+  }
+}
+
+export class SetStringLabel implements RepositoryCommand {
+  target: MyString;
+  before: string;
+  after: string;
+
+  constructor(target: MyString, after: string) {
+    this.target = target;
+    this.before = target.label;
+    this.after = after;
+  }
+
+  action(repo: RDRepository): void {
+    this.target.label = this.after;
+  }
+
+  unaction(repo: RDRepository): void {
+    this.target.label = this.before;
+  }
+}
+
 export class MoveGroup implements RepositoryCommand {
   targets: Elem[];
   delta: Vector;

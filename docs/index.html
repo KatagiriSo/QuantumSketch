@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
@@ -9,302 +8,833 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="">
+    <style>
+        :root {
+            --app-bg: #f5f5f7;
+            --app-gradient-1: #eef2f8;
+            --app-gradient-2: #f8f6f3;
+            --panel-bg: rgba(255, 255, 255, 0.76);
+            --panel-border: rgba(255, 255, 255, 0.52);
+            --panel-border-strong: rgba(255, 255, 255, 0.8);
+            --text-primary: #1d1d1f;
+            --text-secondary: #6e6e73;
+            --accent-color: #0071e3;
+            --accent-soft: rgba(0, 113, 227, 0.14);
+            --danger-color: #ff3b30;
+            --success-color: #00a46a;
+            --shadow-sm: 0 2px 10px rgba(16, 24, 40, 0.08);
+            --shadow-md: 0 12px 34px rgba(16, 24, 40, 0.14);
+            --radius-lg: 20px;
+            --radius-md: 14px;
+            --radius-sm: 10px;
+            --radius-full: 999px;
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Helvetica, Arial, sans-serif;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --app-bg: #07080b;
+                --app-gradient-1: #12161f;
+                --app-gradient-2: #181b20;
+                --panel-bg: rgba(24, 27, 32, 0.72);
+                --panel-border: rgba(255, 255, 255, 0.08);
+                --panel-border-strong: rgba(255, 255, 255, 0.16);
+                --text-primary: #f5f5f7;
+                --text-secondary: #9b9ba1;
+                --accent-soft: rgba(10, 132, 255, 0.28);
+                --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.35);
+                --shadow-md: 0 14px 40px rgba(0, 0, 0, 0.45);
+            }
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            overflow: hidden;
+            font-family: var(--font-stack);
+            color: var(--text-primary);
+            background:
+                radial-gradient(1200px 700px at -10% -10%, rgba(0, 113, 227, 0.12), transparent 60%),
+                radial-gradient(900px 600px at 110% 110%, rgba(255, 204, 128, 0.16), transparent 60%),
+                linear-gradient(150deg, var(--app-gradient-1), var(--app-gradient-2));
+        }
+
+        .glass-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border);
+            box-shadow: var(--shadow-md);
+            backdrop-filter: blur(24px) saturate(1.2);
+            -webkit-backdrop-filter: blur(24px) saturate(1.2);
+            border-radius: var(--radius-lg);
+        }
+
+        .canvas_box {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            border: 0;
+            margin: 0;
+            padding: 0;
+        }
+
+        #canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+        }
+
+        .top-island {
+            position: fixed;
+            top: 16px;
+            left: 20px;
+            right: 20px;
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 14px;
+        }
+
+        .brand-wrap {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+        }
+
+        .brand-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 650;
+            letter-spacing: -0.015em;
+        }
+
+        .brand-sub {
+            margin: 0;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .top-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .qs-btn,
+        .icon-btn,
+        .dock-btn,
+        .chip-btn,
+        .context-menu-item {
+            border: 1px solid transparent;
+            background: transparent;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+            text-decoration: none;
+            user-select: none;
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-color: transparent;
+        }
+
+        .icon-btn:hover,
+        .qs-btn:hover,
+        .dock-btn:hover,
+        .chip-btn:hover {
+            background: rgba(255, 255, 255, 0.5);
+            border-color: var(--panel-border-strong);
+            transform: translateY(-1px);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .icon-btn:hover,
+            .qs-btn:hover,
+            .dock-btn:hover,
+            .chip-btn:hover {
+                background: rgba(255, 255, 255, 0.08);
+            }
+        }
+
+        .qs-btn {
+            border: 1px solid var(--panel-border);
+            border-radius: var(--radius-sm);
+            padding: 7px 10px;
+            font-size: 0.86rem;
+            font-weight: 530;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .qs-btn.primary {
+            background: var(--accent-color);
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .qs-btn.primary:hover {
+            background: #0064c9;
+            box-shadow: 0 6px 18px rgba(0, 113, 227, 0.32);
+        }
+
+        .qs-btn.success {
+            background: var(--success-color);
+            color: #fff;
+            border-color: transparent;
+        }
+
+        .qs-btn.danger {
+            color: var(--danger-color);
+            border-color: rgba(255, 59, 48, 0.35);
+        }
+
+        .qs-btn.block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .chip-btn {
+            border-radius: var(--radius-full);
+            border: 1px solid var(--panel-border);
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 520;
+        }
+
+        .floating-dock {
+            position: fixed;
+            bottom: 22px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 24;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: var(--radius-full);
+        }
+
+        .dock-btn {
+            width: 46px;
+            height: 46px;
+            border-radius: 14px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            border-color: transparent;
+        }
+
+        .dock-btn.active {
+            background: var(--accent-color);
+            color: #fff;
+            border-color: transparent;
+            box-shadow: 0 8px 18px rgba(0, 113, 227, 0.35);
+        }
+
+        .mode-pill {
+            border-radius: var(--radius-full);
+            background: var(--accent-soft);
+            color: var(--accent-color);
+            font-size: 0.72rem;
+            font-weight: 650;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            padding: 5px 10px;
+            min-width: 86px;
+            text-align: center;
+        }
+
+        .dsl-drawer {
+            position: fixed;
+            top: 80px;
+            left: 20px;
+            bottom: 96px;
+            width: min(380px, calc(100vw - 40px));
+            z-index: 28;
+            display: flex;
+            flex-direction: column;
+            transform: translateX(calc(-100% - 28px));
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.28s ease, opacity 0.28s ease;
+            overflow: hidden;
+        }
+
+        .dsl-drawer.is-open {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .dsl-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px 10px;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .dsl-title {
+            margin: 0;
+            font-size: 0.95rem;
+            font-weight: 640;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: var(--text-secondary);
+        }
+
+        .dsl-body {
+            flex: 1 1 auto;
+            overflow-y: auto;
+            padding: 12px 14px 16px;
+        }
+
+        .dsl-section {
+            margin-bottom: 14px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .dsl-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: 0;
+        }
+
+        .section-title {
+            margin: 0 0 8px;
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            font-weight: 650;
+        }
+
+        .field-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            font-weight: 520;
+        }
+
+        .qs-input,
+        .qs-select,
+        .qs-textarea,
+        .qs-number {
+            width: 100%;
+            border: 1px solid var(--panel-border-strong);
+            border-radius: var(--radius-sm);
+            padding: 8px 10px;
+            background: rgba(255, 255, 255, 0.65);
+            color: var(--text-primary);
+            outline: 0;
+            font-size: 0.92rem;
+            line-height: 1.35;
+        }
+
+        .qs-input:focus,
+        .qs-select:focus,
+        .qs-textarea:focus,
+        .qs-number:focus {
+            border-color: var(--accent-color);
+            box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.16);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .qs-input,
+            .qs-select,
+            .qs-textarea,
+            .qs-number {
+                background: rgba(0, 0, 0, 0.3);
+            }
+        }
+
+        .qs-textarea {
+            resize: vertical;
+            min-height: 130px;
+            font-family: "SF Mono", "JetBrains Mono", "Menlo", "Consolas", monospace;
+        }
+
+        .h-stack {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .h-stack > * {
+            flex: 1 1 auto;
+        }
+
+        .macro-grid {
+            display: grid;
+            grid-template-columns: 1.8fr 1fr 1fr 1fr;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .dsl-status {
+            min-height: 1.2rem;
+            font-size: 0.82rem;
+        }
+
+        .dsl-log {
+            border: 1px solid var(--panel-border-strong);
+            border-radius: var(--radius-sm);
+            padding: 8px 10px;
+            max-height: 120px;
+            overflow-y: auto;
+            font-family: "SF Mono", "JetBrains Mono", "Menlo", monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            background: rgba(255, 255, 255, 0.45);
+        }
+
+        @media (prefers-color-scheme: dark) {
+            .dsl-log {
+                background: rgba(0, 0, 0, 0.28);
+            }
+        }
+
+        .template-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .template-btn {
+            border: 1px solid var(--panel-border-strong);
+            border-radius: var(--radius-sm);
+            background: transparent;
+            color: var(--text-primary);
+            min-height: 40px;
+            font-size: 0.8rem;
+            font-weight: 520;
+            line-height: 1.2;
+            padding: 8px 6px;
+        }
+
+        .template-btn:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        .inspector {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            width: min(340px, calc(100vw - 40px));
+            max-height: calc(100vh - 198px);
+            z-index: 26;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .inspector-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 14px 8px;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .inspector-body {
+            padding: 10px 12px 14px;
+            overflow-y: auto;
+        }
+
+        .inspector-section {
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--panel-border);
+        }
+
+        .inspector-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: 0;
+        }
+
+        .selection-line {
+            margin: 0;
+            font-size: 0.82rem;
+            line-height: 1.35;
+            min-height: 1.35em;
+            color: var(--text-primary);
+            overflow-wrap: anywhere;
+        }
+
+        #current {
+            color: #d93025;
+        }
+
+        #sub {
+            color: #198754;
+        }
+
+        .inspector.is-empty .selection-actions,
+        .inspector.is-empty .loop-controls,
+        .inspector.is-empty .selection-meta {
+            display: none;
+        }
+
+        .inspector.is-empty .inspector-empty {
+            display: block;
+        }
+
+        .inspector-empty {
+            display: none;
+            font-size: 0.84rem;
+            color: var(--text-secondary);
+            border: 1px dashed var(--panel-border-strong);
+            border-radius: var(--radius-sm);
+            padding: 10px;
+        }
+
+        .quick-chip-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .selection-action-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+        }
+
+        .inspector-type-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 8px;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+
+        .inspector-chip {
+            border: 1px solid var(--panel-border-strong);
+            border-radius: var(--radius-full);
+            padding: 4px 9px;
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            background: rgba(255, 255, 255, 0.35);
+        }
+
+        .inspector-summary-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 8px;
+            font-size: 0.8rem;
+            margin-bottom: 8px;
+        }
+
+        .inspector-summary-grid strong {
+            font-weight: 620;
+            color: var(--text-primary);
+        }
+
+        .inspector-type-panel {
+            display: none;
+        }
+
+        .inspector[data-selection-kind="line"] #inspector-line-panel {
+            display: block;
+        }
+
+        .inspector[data-selection-kind="loop"] #inspector-loop-panel {
+            display: block;
+        }
+
+        .inspector[data-selection-kind="string"] #inspector-text-panel {
+            display: block;
+        }
+
+        .inspector[data-selection-kind="group"] #inspector-group-panel {
+            display: block;
+        }
+
+        .inspector[data-selection-kind="vertex"] #inspector-vertex-panel {
+            display: block;
+        }
+
+        .inspector.is-empty .selection-common-panel {
+            display: none;
+        }
+
+        .loop-controls {
+            margin-top: 8px;
+            padding-top: 4px;
+        }
+
+        .loop-controls .form-label {
+            font-size: 0.76rem;
+            margin-bottom: 0.25rem;
+            color: var(--text-secondary);
+        }
+
+        .loop-controls .value-badge {
+            font-variant-numeric: tabular-nums;
+            font-weight: 650;
+            color: var(--text-primary);
+        }
+
+        .loop-controls .loop-control-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.45rem;
+        }
+
+        .loop-controls .loop-control-row .form-range {
+            flex: 1 1 auto;
+        }
+
+        .loop-controls .form-range {
+            height: 0.75rem;
+        }
+
+        .loop-controls .btn-group-sm .btn {
+            padding: 0.1rem 0.35rem;
+            font-size: 0.7rem;
+        }
+
+        .loop-controls .loop-metrics {
+            display: flex;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-top: 0.25rem;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+
+        #canvas-context-menu {
+            position: fixed;
+            z-index: 1080;
+            min-width: 13rem;
+            display: none;
+            visibility: hidden;
+            padding: 6px;
+            border-radius: 12px;
+            background: var(--panel-bg);
+            border: 1px solid var(--panel-border-strong);
+            box-shadow: var(--shadow-md);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+        }
+
+        .context-menu-item {
+            width: 100%;
+            border: 0;
+            border-radius: 8px;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.86rem;
+        }
+
+        .context-menu-item:hover {
+            background: var(--accent-soft);
+            color: var(--accent-color);
+        }
+
+        .context-menu-item.text-danger {
+            color: var(--danger-color);
+        }
+
+        #canvas-context-menu hr {
+            margin: 6px 4px;
+            border-top: 1px solid var(--panel-border);
+        }
+
+        .floating-footer {
+            position: fixed;
+            right: 18px;
+            bottom: 18px;
+            z-index: 22;
+            border-radius: var(--radius-full);
+            padding: 8px 14px;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+
+        .floating-footer:hover {
+            color: var(--accent-color);
+        }
+
+        .help-note p {
+            margin: 0 0 10px;
+            padding: 10px 12px;
+            border-left: 4px solid rgba(0, 113, 227, 0.45);
+            background: rgba(0, 113, 227, 0.06);
+            border-radius: 8px;
+        }
+
+        @media (max-width: 1200px) {
+            .top-island {
+                left: 10px;
+                right: 10px;
+            }
+
+            .dsl-drawer {
+                left: 10px;
+                width: min(360px, calc(100vw - 20px));
+            }
+
+            .inspector {
+                right: 10px;
+                width: min(320px, calc(100vw - 20px));
+            }
+        }
+
+        @media (max-width: 960px) {
+            .inspector {
+                top: auto;
+                bottom: 90px;
+                max-height: min(48vh, 390px);
+            }
+
+            .floating-dock {
+                bottom: 12px;
+                padding: 8px;
+                gap: 8px;
+            }
+
+            .dock-btn {
+                width: 42px;
+                height: 42px;
+                font-size: 1rem;
+            }
+
+            .floating-footer {
+                display: none;
+            }
+        }
+
+        @media (max-width: 760px) {
+            .top-island {
+                padding: 8px 10px;
+            }
+
+            .brand-sub {
+                display: none;
+            }
+
+            .dsl-drawer {
+                top: 70px;
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: 86px;
+                transform: translateY(16px);
+            }
+
+            .dsl-drawer.is-open {
+                transform: translateY(0);
+            }
+
+            .inspector {
+                left: 10px;
+                right: 10px;
+                width: auto;
+                bottom: 86px;
+                top: auto;
+                max-height: min(44vh, 360px);
+            }
+
+            .selection-action-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .template-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .macro-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+        }
+    </style>
 </head>
-<style type="text/css">
-    div.add p {
-        display: inline-block;
-        border-left: solid 5px orange;
-        border-bottom: solid 1px gray;
-        padding: 10px;
-    }
-
-    div.select p {
-        display: inline-block;
-        border-left: solid 5px mediumturquoise;
-        border-bottom: solid 1px gray;
-        padding: 10px;
-    }
-
-    div.linestyle p {
-        display: inline-block;
-        border-left: solid 5px skyblue;
-        border-bottom: solid 1px gray;
-        padding: 10px;
-    }
-
-    div.move p {
-        display: inline-block;
-        border-left: solid 5px blue;
-        border-bottom: solid 1px gray;
-        padding: 10px;
-    }
-
-    div.mode p {
-        display: inline-block;
-        border-left: solid 5px yellowgreen;
-        border-bottom: solid 1px gray;
-        padding: 10px;
-    }
-
-    div.loop p {
-        display: inline-block;
-        border-left: solid 5px mediumpurple;
-        border-bottom: solid 1px gray;
-        padding: 10px;
-    }
-
-    div.canvas_box {
-        display: block;
-        border-left: solid 5px black;
-        border-right: solid 5px black;
-        border-bottom: solid 1px gray;
-        border-top: solid 1px gray;
-
-        padding: 0px;
-        margin: 0;
-        width: auto;
-        height: auto;
-        box-sizing: content-box;
-        position: absolute;
-        top: 5rem;
-        right: 1rem;
-        bottom: 3.5rem;
-        left: 23.5rem;
-    }
-
-    #canvas {
-        width: 100%;
-        height: 100%;
-        display: block;
-    }
-
-        help {
-        display: inline-block;
-        border-left: solid 1px black;
-        border-right: solid 1px black;
-        border-bottom: solid 1px gray;
-        border-top: solid 1px gray;
-        padding: 0px 6px 0px 6px;
-    }
-
-    .tool-sidebar {
-        width: 22rem;
-        pointer-events: auto;
-        top: 5rem;
-        bottom: 1rem;
-        overflow-y: auto;
-        z-index: 1030;
-    }
-
-    @media (max-width: 1200px) {
-        .tool-sidebar {
-            width: 18rem;
-        }
-        div.canvas_box {
-            left: 19rem;
-        }
-    }
-
-    .tool-panel {
-        border-radius: 1rem;
-    }
-
-    .tool-panel .btn {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: flex-start;
-        gap: 0.5rem;
-        text-align: left;
-    }
-
-    .tool-panel .btn .tool-label {
-        flex: 1 1 auto;
-    }
-
-    .tool-panel .btn i {
-        font-size: 1.1rem;
-    }
-
-    .tool-panel .btn.active {
-        background-color: var(--bs-primary-bg-subtle);
-        border-color: var(--bs-primary-border-subtle);
-        color: var(--bs-primary-text);
-    }
-
-    .tool-mode-indicator {
-        font-size: 0.75rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-    }
-
-    .tool-section-title {
-        font-size: 0.75rem;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-        color: var(--bs-secondary-color);
-        padding: 0.25rem 0.5rem;
-    }
-
-    #canvas-context-menu {
-        position: fixed;
-        z-index: 1080;
-        min-width: 12rem;
-        display: none;
-        visibility: hidden;
-    }
-
-    #canvas-context-menu .context-menu-item {
-        background: transparent;
-        border: 0;
-        width: 100%;
-        text-align: left;
-        padding: 0.5rem 0.75rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    #canvas-context-menu .context-menu-item:hover {
-        background-color: var(--bs-secondary-bg);
-    }
-
-    #canvas-context-menu .context-menu-item i {
-        font-size: 1rem;
-    }
-
-    #canvas-context-menu hr {
-        margin: 0.25rem 0.5rem;
-    }
-
-    .loop-controls {
-        border-top: 1px solid var(--bs-border-color, rgba(0, 0, 0, 0.1));
-        padding-top: 0.75rem;
-        margin-top: 0.75rem;
-    }
-
-    .loop-controls .form-label {
-        font-size: 0.75rem;
-        margin-bottom: 0.25rem;
-    }
-
-    .loop-controls .value-badge {
-        font-variant-numeric: tabular-nums;
-        font-weight: 600;
-    }
-
-    .loop-controls .loop-control-row {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.5rem;
-    }
-
-    .loop-controls .loop-control-row .form-range {
-        flex: 1 1 auto;
-    }
-
-    .loop-controls .form-range {
-        height: 0.75rem;
-    }
-
-    .loop-controls .btn-group-sm .btn {
-        padding: 0.1rem 0.35rem;
-        font-size: 0.7rem;
-    }
-
-    .loop-controls .loop-metrics {
-        display: flex;
-        justify-content: space-between;
-        gap: 0.5rem;
-        margin-top: 0.25rem;
-    }
-
-    .dsl-status {
-        min-height: 1.25rem;
-    }
-
-    .dsl-log {
-        max-height: 10rem;
-        overflow-y: auto;
-        font-variant-numeric: tabular-nums;
-        white-space: pre-wrap;
-    }
-</style>
-
 <body>
-    <!--[if lt IE 7]>
-            <p class="browsehappy">You are using an <strong>outdated</strong> browser. Please <a href="#">upgrade your browser</a> to improve your experience.</p>
-    <![endif]-->
-
-    <nav class="navbar navbar-expand-md fixed-top bg-body-tertiary border-bottom shadow-sm">
-        <div class="container">
-            <!-- Branding Image -->
-            <a class="navbar-brand" href="">Quantum Sketch</a>
-
-            <!-- Collapsed Hamburger -->
-            <button type="button" class="navbar-toggler" data-bs-toggle="collapse" data-bs-target="#navbar">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-
-            <div class="collapse navbar-collapse" id="navbar">
-                <!-- Left Side Of Navbar -->
-                <ul class="navbar-nav me-auto">
-                </ul>
-
-                <!-- Right Side Of Navbar -->
-                <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a href="" id="nav-undo" class="nav-link"><i class="bi bi-arrow-counterclockwise"></i> Undo</a>
-                    </li>
-                    <li class="nav-item">
-                        <a href="" id="nav-redo" class="nav-link"><i class="bi bi-arrow-clockwise"></i> Redo</a>
-                    </li>
-                    <li class="nav-item dropdown">
-                        <a href="" class="nav-link dropdown-toggle" data-bs-toggle="dropdown"><i class="bi bi-file-earmark"></i> Export</a>
-                        <ul class="dropdown-menu">
-                            <li><a href="" id="nav-export-tikz" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modal-export-tikz">Tikz text</a></li>
-                            <li><a href="" id="nav-export-svg" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modal-export-svg">SVG text</a></li>
-                            <li><hr class="dropdown-divider"></li>
-                            <li><a href="" id="download" class="dropdown-item" download="diagram.svg">SVG download</a></li>
-                        </ul>
-                    </li>
-                    <li class="nav-item">
-                        <a href="" id="nav-help" class="nav-link" data-bs-toggle="modal" data-bs-target="#modal-help"><i class="bi bi-info-circle"></i> Help</a>
-                    </li>
-                </ul>
-            </div>
-        </div>
-    </nav>
-
-    <div class="container-fluid">
-        <div class="canvas_box">
-            <canvas id="canvas" width="640" height="480"></canvas>
-        </div>
+    <div class="canvas_box">
+        <canvas id="canvas" width="640" height="480"></canvas>
     </div>
 
-    <!-- Command Panel -->
-    <div class="tool-sidebar position-fixed start-0 ps-3">
-        <div class="tool-panel border bg-body-tertiary shadow-sm p-2">
-            <div class="tool-section-title">DSL Studio</div>
-            <div class="mb-2 px-1">
-                <label for="dsl-input" class="form-label small mb-1">Quick command</label>
-                <div class="input-group input-group-sm mb-2">
-                    <input
-                        id="dsl-input"
-                        type="text"
-                        class="form-control"
-                        placeholder="start 10 10; line right 8 electron"
-                        autocomplete="off"
-                        spellcheck="false"
-                    >
-                    <button id="dsl-run" type="button" class="btn btn-primary">Run</button>
-                    <button id="dsl-clear" type="button" class="btn btn-outline-secondary">Clear</button>
+    <header class="top-island glass-panel">
+        <div class="brand-wrap">
+            <h1 class="brand-title">QuantumSketch</h1>
+            <p class="brand-sub">Quantum Canvas</p>
+        </div>
+        <div class="top-actions">
+            <a href="" id="nav-undo" class="icon-btn" title="Undo" aria-label="Undo"><i class="bi bi-arrow-counterclockwise"></i></a>
+            <a href="" id="nav-redo" class="icon-btn" title="Redo" aria-label="Redo"><i class="bi bi-arrow-clockwise"></i></a>
+            <div class="dropdown">
+                <button type="button" class="icon-btn" data-bs-toggle="dropdown" aria-expanded="false" title="Export" aria-label="Export">
+                    <i class="bi bi-file-earmark-arrow-down"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a href="" id="nav-export-tikz" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modal-export-tikz">Tikz text</a></li>
+                    <li><a href="" id="nav-export-svg" class="dropdown-item" data-bs-toggle="modal" data-bs-target="#modal-export-svg">SVG text</a></li>
+                    <li><hr class="dropdown-divider"></li>
+                    <li><a href="" id="download" class="dropdown-item" download="diagram.svg">SVG download</a></li>
+                </ul>
+            </div>
+            <button id="dsl-panel-toggle" type="button" class="icon-btn" title="Open DSL Studio" aria-label="Open DSL Studio" aria-expanded="false">
+                <i class="bi bi-code-slash"></i>
+            </button>
+            <a href="" id="nav-help" class="icon-btn" data-bs-toggle="modal" data-bs-target="#modal-help" title="Help" aria-label="Help">
+                <i class="bi bi-info-circle"></i>
+            </a>
+        </div>
+    </header>
+
+    <aside id="dsl-drawer" class="dsl-drawer glass-panel" aria-hidden="true">
+        <div class="dsl-header">
+            <h2 class="dsl-title">DSL Studio</h2>
+            <button id="dsl-panel-close" type="button" class="icon-btn" aria-label="Close DSL Studio">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+        <div class="dsl-body">
+            <section class="dsl-section">
+                <p class="section-title">Quick Command</p>
+                <label for="dsl-input" class="field-label">Single-line command runner</label>
+                <div class="h-stack" style="margin-bottom:8px;">
+                    <input id="dsl-input" type="text" class="qs-input" placeholder="start 10 10; line right 8 electron" autocomplete="off" spellcheck="false">
                 </div>
-                <label for="dsl-example-select" class="form-label small mb-1">Examples</label>
-                <div class="input-group input-group-sm mb-2">
-                    <select id="dsl-example-select" class="form-select">
+                <div class="h-stack" style="margin-bottom:10px;">
+                    <button id="dsl-run" type="button" class="qs-btn primary">Run</button>
+                    <button id="dsl-clear" type="button" class="qs-btn">Clear</button>
+                </div>
+                <label for="dsl-example-select" class="field-label">Examples</label>
+                <div class="h-stack" style="margin-bottom:8px;">
+                    <select id="dsl-example-select" class="qs-select">
                         <option value="">Select example...</option>
                         <option value="start 10 10; line right 8 electron">Electron segment</option>
                         <option value="start 10 10; prop up 6 photon">Photon emission</option>
@@ -325,63 +855,55 @@
                         <option value="qed_se 10 15 40">QED: electron self energy macro</option>
                         <option value="qed_vp 10 15 40">QED: vacuum polarization macro</option>
                     </select>
-                    <button id="dsl-insert-example" type="button" class="btn btn-outline-secondary">Insert</button>
+                    <button id="dsl-insert-example" type="button" class="qs-btn">Insert</button>
                 </div>
-                <label class="form-label small mb-1">Macro builder (paper-ready presets)</label>
-                <div class="row g-1 mb-2">
-                    <div class="col-6">
-                        <select id="dsl-macro-kind" class="form-select form-select-sm">
-                            <option value="qed_se">QED Self Energy</option>
-                            <option value="qed_vp">QED Vacuum Polarization</option>
-                        </select>
-                    </div>
-                    <div class="col-2">
-                        <input id="dsl-macro-x" type="number" class="form-control form-control-sm" value="10" aria-label="x">
-                    </div>
-                    <div class="col-2">
-                        <input id="dsl-macro-y" type="number" class="form-control form-control-sm" value="15" aria-label="y">
-                    </div>
-                    <div class="col-2">
-                        <input id="dsl-macro-length" type="number" class="form-control form-control-sm" value="40" aria-label="length">
-                    </div>
-                    <div class="col-12">
-                        <button id="dsl-build-macro" type="button" class="btn btn-outline-secondary btn-sm w-100">Build Macro Command</button>
-                    </div>
+                <div id="dsl-status" class="dsl-status text-secondary"></div>
+                <div id="dsl-log" class="dsl-log">Execution log is empty.</div>
+            </section>
+
+            <section class="dsl-section">
+                <p class="section-title">Macro Builder</p>
+                <div class="macro-grid" style="margin-bottom:8px;">
+                    <select id="dsl-macro-kind" class="qs-select">
+                        <option value="qed_se">QED Self Energy</option>
+                        <option value="qed_vp">QED Vacuum Polarization</option>
+                    </select>
+                    <input id="dsl-macro-x" type="number" class="qs-number" value="10" aria-label="x">
+                    <input id="dsl-macro-y" type="number" class="qs-number" value="15" aria-label="y">
+                    <input id="dsl-macro-length" type="number" class="qs-number" value="40" aria-label="length">
                 </div>
-                <label for="dsl-script" class="form-label small mb-1">Script editor (one command per line)</label>
-                <textarea id="dsl-script" class="form-control form-control-sm mb-1" rows="6" placeholder="# Relative DSL example&#10;start 10 10&#10;line right 5 electron&#10;branch&#10;prop up 5 photon&#10;next&#10;line right 5 electron"></textarea>
-                <div class="btn-group btn-group-sm w-100 mb-2" role="group" aria-label="Script actions">
-                    <button id="dsl-run-script" type="button" class="btn btn-success">Run Script</button>
-                    <button id="dsl-copy-script" type="button" class="btn btn-outline-secondary">Copy</button>
+                <button id="dsl-build-macro" type="button" class="qs-btn block">Build Macro Command</button>
+            </section>
+
+            <section class="dsl-section">
+                <p class="section-title">Script Editor</p>
+                <label for="dsl-script" class="field-label">One command per line. Ctrl/⌘ + Enter to run.</label>
+                <textarea id="dsl-script" class="qs-textarea" rows="7" placeholder="# Relative DSL example&#10;start 10 10&#10;line right 5 electron&#10;branch&#10;prop up 5 photon&#10;next&#10;line right 5 electron"></textarea>
+                <div class="h-stack" style="margin-top:8px; margin-bottom:10px;">
+                    <button id="dsl-run-script" type="button" class="qs-btn success">Run Script</button>
+                    <button id="dsl-copy-script" type="button" class="qs-btn">Copy</button>
                 </div>
-                <div id="dsl-status" class="dsl-status small text-secondary mb-2"></div>
-                <div id="dsl-log" class="dsl-log small border rounded bg-body-tertiary p-2 mb-2">Execution log is empty.</div>
-                <details class="small mb-1">
-                    <summary>DSL command reference</summary>
-                    <div class="mt-1">
+                <details>
+                    <summary style="cursor:pointer; color:var(--text-secondary); font-size:0.82rem;">DSL command reference</summary>
+                    <div style="margin-top:8px; font-size:0.82rem; line-height:1.45;">
                         <div><code>start x y</code> / <code>move x y</code> Set cursor position.</div>
-                        <div><code>line direction length [particle|style]</code> Relative edge draw from cursor; cursor moves to end.</div>
-                        <div><code>line x1 y1 x2 y2 [particle|style]</code> Absolute edge draw (for macro editing and precision fixes).</div>
-                        <div><code>prop direction length [particle|style]</code> Alias of <code>line</code>.</div>
-                        <div><code>loop radius</code> Draw a loop centered at current cursor vertex.</div>
-                        <div><code>loop x y radius [style] [beginAngle] [endAngle]</code> Absolute loop draw for editable macros.</div>
-                        <div><code>branch</code> Save current cursor as branch anchor.</div>
-                        <div><code>next</code> Return cursor to last branch anchor.</div>
-                        <div><code>join [tolerance] [force|soft]</code> Snap cursor vertex to nearby vertex and merge graph nodes.</div>
-                        <div><code>join_mode on|off</code> (or <code>join_cleanup on|off</code>) Toggle forced orphan-vertex cleanup after join.</div>
-                        <div><code>template qed_box|qed_vertex|qed_vac|penguin|compton|s_channel|triangle|t_channel|w_exchange|bhabha_t|sunset|double_box</code> Instantiate editable physics diagram presets.</div>
-                        <div><code>qed_se x y length</code> Electron self-energy macro.</div>
-                        <div><code>qed_vp x y length</code> Vacuum polarization macro.</div>
-                        <div><code># comment</code> and <code>// comment</code> are ignored in script editor.</div>
-                        <div>You can separate commands with newlines or <code>;</code>.</div>
+                        <div><code>line direction length [particle|style]</code> Relative edge draw; cursor moves to end.</div>
+                        <div><code>line x1 y1 x2 y2 [particle|style]</code> Absolute edge draw.</div>
+                        <div><code>prop ...</code> Alias of <code>line</code>.</div>
+                        <div><code>loop radius</code> Draw loop centered at cursor vertex.</div>
+                        <div><code>loop x y radius [style] [beginAngle] [endAngle]</code> Absolute loop draw.</div>
+                        <div><code>branch</code>, <code>next</code>, <code>join [tolerance] [force|soft]</code>, <code>join_mode on|off</code>.</div>
+                        <div><code>template qed_box|qed_vertex|qed_vac|penguin|compton|s_channel|triangle|t_channel|w_exchange|bhabha_t|sunset|double_box</code></div>
+                        <div><code>qed_se x y length</code>, <code>qed_vp x y length</code></div>
+                        <div><code># comment</code> / <code>// comment</code> ignored in script mode.</div>
                     </div>
                 </details>
-                <div class="form-text">Shortcuts: <code>/</code> focus command box, <code>Enter</code> run command, <code>Ctrl/⌘+Enter</code> run script.</div>
-            </div>
-            <div class="tool-section-title">Presets</div>
-            <div class="px-1 mb-2">
-                <label for="dsl-template-catalog" class="form-label small mb-1">Diagram catalog (editable macro)</label>
-                <select id="dsl-template-catalog" class="form-select form-select-sm mb-1">
+            </section>
+
+            <section class="dsl-section">
+                <p class="section-title">Diagram Catalog</p>
+                <label for="dsl-template-catalog" class="field-label">Editable paper-ready templates</label>
+                <select id="dsl-template-catalog" class="qs-select" style="margin-bottom:8px;">
                     <option value="qed_box">QED Box</option>
                     <option value="qed_vertex">QED Vertex</option>
                     <option value="qed_vac">QED Vacuum</option>
@@ -395,307 +917,255 @@
                     <option value="sunset">Sunset</option>
                     <option value="double_box">Double Box</option>
                 </select>
-                <div id="dsl-template-help" class="small text-secondary mb-1">
-                    Select a preset to load its macro into the script editor.
+                <div id="dsl-template-help" style="font-size:0.82rem; color:var(--text-secondary); margin-bottom:8px;">Select a preset to load its macro into the script editor.</div>
+                <div class="h-stack" style="margin-bottom:8px;">
+                    <button id="dsl-load-template-macro" type="button" class="qs-btn">Load Macro</button>
+                    <button id="dsl-run-template-macro" type="button" class="qs-btn success">Load + Run</button>
                 </div>
-                <div class="btn-group btn-group-sm w-100">
-                    <button id="dsl-load-template-macro" type="button" class="btn btn-outline-secondary">Load Macro</button>
-                    <button id="dsl-run-template-macro" type="button" class="btn btn-success">Load + Run</button>
+                <div class="template-grid">
+                    <button type="button" class="template-btn" data-template="qed_box" title="QED 1-loop box scattering">QED Box</button>
+                    <button type="button" class="template-btn" data-template="qed_vertex" title="QED vertex correction">QED Vertex</button>
+                    <button type="button" class="template-btn" data-template="qed_vac" title="QED vacuum polarization">QED Vacuum</button>
+                    <button type="button" class="template-btn" data-template="penguin" title="Penguin diagram template">Penguin</button>
+                    <button type="button" class="template-btn" data-template="compton" title="Compton scattering">Compton</button>
+                    <button type="button" class="template-btn" data-template="s_channel" title="s-channel topology">s-channel</button>
+                    <button type="button" class="template-btn" data-template="triangle" title="Triangle loop">Triangle</button>
+                    <button type="button" class="template-btn" data-template="t_channel" title="t-channel topology">t-channel</button>
+                    <button type="button" class="template-btn" data-template="w_exchange" title="W exchange">W Exchange</button>
+                    <button type="button" class="template-btn" data-template="bhabha_t" title="Bhabha t-channel">Bhabha t</button>
+                    <button type="button" class="template-btn" data-template="sunset" title="Sunset self-energy">Sunset</button>
+                    <button type="button" class="template-btn" data-template="double_box" title="Double box loop">Double Box</button>
                 </div>
-            </div>
-            <div class="btn-group-vertical w-100 mb-2" role="group" aria-label="Physics templates">
-                <button type="button" class="btn btn-outline-secondary" data-template="qed_box" title="QED 1-loop box scattering">
-                    <i class="bi bi-bounding-box-circles"></i><span class="tool-label">QED Box</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="qed_vertex" title="QED vertex correction">
-                    <i class="bi bi-diagram-3"></i><span class="tool-label">QED Vertex</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="qed_vac" title="QED vacuum polarization">
-                    <i class="bi bi-circle"></i><span class="tool-label">QED Vacuum</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="penguin" title="Penguin diagram template">
-                    <i class="bi bi-bezier2"></i><span class="tool-label">Penguin</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="compton" title="Compton scattering">
-                    <i class="bi bi-diagram-2"></i><span class="tool-label">Compton</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="s_channel" title="s-channel topology">
-                    <i class="bi bi-signpost-split"></i><span class="tool-label">s-channel</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="triangle" title="Triangle loop">
-                    <i class="bi bi-triangle"></i><span class="tool-label">Triangle</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="t_channel" title="t-channel topology">
-                    <i class="bi bi-diagram-3"></i><span class="tool-label">t-channel</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="w_exchange" title="W exchange">
-                    <i class="bi bi-lightning-charge"></i><span class="tool-label">W Exchange</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="bhabha_t" title="Bhabha t-channel">
-                    <i class="bi bi-bezier"></i><span class="tool-label">Bhabha t</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="sunset" title="Sunset self-energy">
-                    <i class="bi bi-brightness-high"></i><span class="tool-label">Sunset</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-template="double_box" title="Double box loop">
-                    <i class="bi bi-grid-3x3-gap"></i><span class="tool-label">Double Box</span>
-                </button>
-            </div>
-            <div class="tool-section-title">Tools</div>
-            <div id="mode" class="tool-mode-indicator rounded-pill bg-body-secondary text-center fw-semibold mb-3 px-3 py-1">Select</div>
-            <div class="btn-group-vertical w-100" role="group" aria-label="Drawing modes">
-                <button type="button" class="btn btn-outline-secondary" data-command="mode-normal" data-mode="normal" title="Select and edit elements">
-                    <i class="bi bi-cursor"></i><span class="tool-label">Select</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="mode-line" data-mode="line" title="Draw propagators">
-                    <i class="bi bi-bezier"></i><span class="tool-label">Line</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="mode-loop" data-mode="loop" title="Draw loops">
-                    <i class="bi bi-circle"></i><span class="tool-label">Loop</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="mode-point" data-mode="point" title="Place vertices with clicks">
-                    <i class="bi bi-record-fill"></i><span class="tool-label">Point</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="mode-string" data-mode="string" title="Insert text labels with clicks">
-                    <i class="bi bi-type"></i><span class="tool-label">Text</span>
-                </button>
-            </div>
-            <div class="tool-section-title mt-3">Quick Add (last cursor)</div>
-            <div class="btn-group-vertical w-100" role="group" aria-label="Create elements">
-                <button type="button" class="btn btn-outline-secondary" data-command="add-vertex" title="Add a vertex at the last cursor position">
-                    <i class="bi bi-plus-circle"></i><span class="tool-label">Add Vertex</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="add-loop" title="Add a loop at the last cursor position">
-                    <i class="bi bi-bounding-box-circles"></i><span class="tool-label">Add Loop</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="add-text" title="Insert a text label at the last cursor position">
-                    <i class="bi bi-card-text"></i><span class="tool-label">Add Text</span>
-                </button>
-            </div>
-            <div class="tool-section-title mt-3">Selection actions</div>
-            <div class="btn-group-vertical w-100" role="group" aria-label="Edit selection">
-                <button type="button" class="btn btn-outline-secondary" data-command="fill" title="Fill the selected loop">
-                    <i class="bi bi-paint-bucket"></i><span class="tool-label">Fill Loop</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="toggle-arrow" title="Toggle arrow direction on the selected propagator">
-                    <i class="bi bi-arrow-repeat"></i><span class="tool-label">Toggle Arrow</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="change-type" title="Cycle the propagator type">
-                    <i class="bi bi-shuffle"></i><span class="tool-label">Change Type</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="change-style" title="Cycle the propagator style">
-                    <i class="bi bi-bezier2"></i><span class="tool-label">Change Style</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="arrow-rotate-left" title="Rotate arrow counter-clockwise">
-                    <i class="bi bi-arrow-counterclockwise"></i><span class="tool-label">Arrow ↺</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="arrow-rotate-right" title="Rotate arrow clockwise">
-                    <i class="bi bi-arrow-clockwise"></i><span class="tool-label">Arrow ↻</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="arrow-reset" title="Reset arrow rotation">
-                    <i class="bi bi-arrow-return-left"></i><span class="tool-label">Arrow Reset</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="rotation" title="Rotate clockwise">
-                    <i class="bi bi-arrow-clockwise"></i><span class="tool-label">Rotate CW</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="anti-rotation" title="Rotate counterclockwise">
-                    <i class="bi bi-arrow-counterclockwise"></i><span class="tool-label">Rotate CCW</span>
-                </button>
-                <button type="button" class="btn btn-outline-danger" data-command="delete" title="Delete the selected element">
-                    <i class="bi bi-trash"></i><span class="tool-label">Delete</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="group-selection" data-selection-required="true" title="Group selected elements">
-                    <i class="bi bi-collection"></i><span class="tool-label">Group</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" data-command="ungroup-selection" data-selection-required="true" title="Ungroup selected group">
-                    <i class="bi bi-layout-split"></i><span class="tool-label">Ungroup</span>
-                </button>
-            </div>
-            <div id="loop-controls" class="loop-controls d-none">
-                <div class="tool-section-title mb-2">Loop controls</div>
-                <label class="form-label d-flex justify-content-between align-items-center">
-                    <span>Radius</span>
-                    <span id="loop-radius-value" class="value-badge">--</span>
-                </label>
-                <div class="loop-control-row">
-                    <input type="range" class="form-range" id="loop-radius" min="1" max="80" step="0.5" value="1">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-secondary" data-loop-step="radius" data-step="-1" title="Shrink loop">-</button>
-                        <button type="button" class="btn btn-outline-secondary" data-loop-step="radius" data-step="1" title="Grow loop">+</button>
-                    </div>
-                </div>
-                <label class="form-label d-flex justify-content-between align-items-center">
-                    <span>Gap start</span>
-                    <span id="loop-start-value" class="value-badge">--°</span>
-                </label>
-                <div class="loop-control-row">
-                    <input type="range" class="form-range" id="loop-gap-start" min="0" max="360" step="1" value="0">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-secondary" data-loop-step="start" data-step="-5" title="Start -5°">-5°</button>
-                        <button type="button" class="btn btn-outline-secondary" data-loop-step="start" data-step="5" title="Start +5°">+5°</button>
-                    </div>
-                </div>
-                <label class="form-label d-flex justify-content-between align-items-center">
-                    <span>Gap end</span>
-                    <span id="loop-end-value" class="value-badge">--°</span>
-                </label>
-                <div class="loop-control-row">
-                    <input type="range" class="form-range" id="loop-gap-end" min="0" max="360" step="1" value="360">
-                    <div class="btn-group btn-group-sm" role="group">
-                        <button type="button" class="btn btn-outline-secondary" data-loop-step="end" data-step="-5" title="End -5°">-5°</button>
-                        <button type="button" class="btn btn-outline-secondary" data-loop-step="end" data-step="5" title="End +5°">+5°</button>
-                    </div>
-                </div>
-                <div class="loop-metrics small text-secondary">
-                    <span>Arc <span id="loop-arc-value">--°</span></span>
-                    <span>Gap <span id="loop-gap-value">--°</span></span>
-                </div>
-                <div class="btn-group btn-group-sm w-100 mt-2" role="group">
-                    <button type="button" class="btn btn-outline-secondary" data-loop-action="full">Full loop</button>
-                    <button type="button" class="btn btn-outline-secondary" data-loop-action="gap60">Open 60° gap</button>
-                    <button type="button" class="btn btn-outline-secondary" data-loop-action="gap180">Half arc</button>
-                </div>
+            </section>
+        </div>
+    </aside>
+
+    <aside id="selection-inspector" class="inspector glass-panel is-empty">
+        <div class="inspector-head">
+            <div class="mode-pill" id="mode">Select</div>
+            <div class="quick-chip-row">
+                <button type="button" class="chip-btn" data-command="undo"><i class="bi bi-arrow-counterclockwise"></i> Undo</button>
+                <button type="button" class="chip-btn" data-command="redo"><i class="bi bi-arrow-clockwise"></i> Redo</button>
             </div>
         </div>
-    </div>
+        <div class="inspector-body">
+            <div class="inspector-type-head">
+                <strong id="inspector-selection-type">No selection</strong>
+                <span id="inspector-selection-count" class="inspector-chip">No selection</span>
+            </div>
+            <div class="inspector-section selection-meta">
+                <div id="current" class="selection-line">-</div>
+                <div id="sub" class="selection-line">-</div>
+            </div>
+            <div class="inspector-empty">Nothing selected. Click a line, loop, or text label to open type-specific editing controls.</div>
 
-    <div id="canvas-context-menu" class="bg-body-tertiary border shadow-sm rounded p-1">
-        <button type="button" class="context-menu-item" data-command="undo">
-            <i class="bi bi-arrow-counterclockwise"></i><span>Undo</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="redo">
-            <i class="bi bi-arrow-clockwise"></i><span>Redo</span>
-        </button>
-        <hr>
-        <button type="button" class="context-menu-item" data-command="select-here">
-            <i class="bi bi-cursor"></i><span>Select here</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="sub-select-here">
-            <i class="bi bi-crosshair"></i><span>Set sub-selection</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="select-all">
-            <i class="bi bi-bounding-box"></i><span>Select all</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="copy-selection" data-selection-required="true">
-            <i class="bi bi-copy"></i><span>Copy selection</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="cut-selection" data-selection-required="true">
-            <i class="bi bi-scissors"></i><span>Cut selection</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="paste-selection">
-            <i class="bi bi-clipboard-plus"></i><span>Paste</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="edit-selection-macro" data-selection-required="true">
-            <i class="bi bi-code-slash"></i><span>Edit as macro</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="group-selection" data-selection-required="true">
-            <i class="bi bi-collection"></i><span>Group</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="ungroup-selection" data-selection-required="true">
-            <i class="bi bi-layout-split"></i><span>Ungroup</span>
-        </button>
-        <hr>
-        <button type="button" class="context-menu-item" data-command="add-vertex">
-            <i class="bi bi-plus-circle"></i><span>Add vertex</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="add-loop">
-            <i class="bi bi-bounding-box-circles"></i><span>Add loop</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="add-line-from-pointer">
-            <i class="bi bi-arrow-right"></i><span>Propagator start/finish</span>
-        </button>
-        <button type="button" class="context-menu-item" data-command="add-text">
-            <i class="bi bi-card-text"></i><span>Add text</span>
-        </button>
-        <hr>
-        <button type="button" class="context-menu-item text-danger" data-command="delete" data-selection-required="true">
-            <i class="bi bi-trash"></i><span>Delete selection</span>
-        </button>
-    </div>
+            <section id="inspector-line-panel" class="inspector-section inspector-type-panel">
+                <p class="section-title">Line Inspector</p>
+                <div class="inspector-summary-grid">
+                    <span>Length <strong id="inspector-line-length">--</strong></span>
+                    <span>Arrow <strong id="inspector-line-arrow">--</strong></span>
+                </div>
+                <label for="inspector-line-style" class="field-label">Line style</label>
+                <select id="inspector-line-style" class="qs-select" style="margin-bottom:8px;">
+                    <option value="normal">normal</option>
+                    <option value="dash">dash</option>
+                    <option value="wave">wave (photon)</option>
+                    <option value="coil">coil (gluon)</option>
+                    <option value="double">double</option>
+                </select>
+                <label for="inspector-line-label" class="field-label">Line label / TeX</label>
+                <div class="h-stack">
+                    <input id="inspector-line-label" type="text" class="qs-input" placeholder="e.g. $p$">
+                    <button id="inspector-line-label-apply" type="button" class="qs-btn">Apply</button>
+                </div>
+                <div class="selection-action-grid mt-2">
+                    <button type="button" class="qs-btn" data-command="toggle-arrow" data-selection-required="true"><i class="bi bi-arrow-repeat"></i> Toggle Arrow</button>
+                    <button type="button" class="qs-btn" data-command="change-type" data-selection-required="true"><i class="bi bi-shuffle"></i> Swap Ends</button>
+                    <button type="button" class="qs-btn" data-command="arrow-rotate-left" data-selection-required="true"><i class="bi bi-arrow-counterclockwise"></i> Arrow Left</button>
+                    <button type="button" class="qs-btn" data-command="arrow-rotate-right" data-selection-required="true"><i class="bi bi-arrow-clockwise"></i> Arrow Right</button>
+                    <button type="button" class="qs-btn" data-command="arrow-reset" data-selection-required="true"><i class="bi bi-arrow-return-left"></i> Arrow Reset</button>
+                    <button id="inspector-line-straighten" type="button" class="qs-btn"><i class="bi bi-slash-lg"></i> Straighten</button>
+                </div>
+            </section>
 
-    <!-- Detail of Selected Element -->
-    <div class="position-fixed bottom-0 start-0" style = "width: 25rem; left: 15rem; bottom: 1rem; z-index: 1020;">
-        <div class="border bg-body-tertiary shadow-sm m-2 p-1">
-            <div id="current" class="text-danger m-1">-</div>
-            <hr class="border m-1">
-            <div id="sub" class="text-success m-1">-</div>
+            <section id="inspector-loop-panel" class="inspector-section inspector-type-panel">
+                <p class="section-title">Loop Inspector</p>
+                <div id="inspector-loop-state" class="inspector-chip mb-2">arrow -- / fill --</div>
+                <label for="inspector-loop-style" class="field-label">Loop style</label>
+                <select id="inspector-loop-style" class="qs-select" style="margin-bottom:8px;">
+                    <option value="normal">normal</option>
+                    <option value="dash">dash</option>
+                    <option value="wave">wave (photon)</option>
+                    <option value="coil">coil (gluon)</option>
+                </select>
+                <label for="inspector-loop-label" class="field-label">Loop label / TeX</label>
+                <div class="h-stack" style="margin-bottom:8px;">
+                    <input id="inspector-loop-label" type="text" class="qs-input" placeholder="e.g. $k$">
+                    <button id="inspector-loop-label-apply" type="button" class="qs-btn">Apply</button>
+                </div>
+                <div class="selection-action-grid mb-2">
+                    <button type="button" class="qs-btn" data-command="fill" data-selection-required="true"><i class="bi bi-paint-bucket"></i> Toggle Fill</button>
+                    <button type="button" class="qs-btn" data-command="toggle-arrow" data-selection-required="true"><i class="bi bi-arrow-repeat"></i> Toggle Arrow</button>
+                </div>
+
+                <div id="loop-controls" class="loop-controls d-none">
+                    <p class="section-title">Loop Geometry</p>
+                    <label class="form-label d-flex justify-content-between align-items-center">
+                        <span>Radius</span>
+                        <span id="loop-radius-value" class="value-badge">--</span>
+                    </label>
+                    <div class="loop-control-row">
+                        <input type="range" class="form-range" id="loop-radius" min="1" max="80" step="0.5" value="1">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" data-loop-step="radius" data-step="-1" title="Shrink loop">-</button>
+                            <button type="button" class="btn btn-outline-secondary" data-loop-step="radius" data-step="1" title="Grow loop">+</button>
+                        </div>
+                    </div>
+
+                    <label class="form-label d-flex justify-content-between align-items-center">
+                        <span>Gap start</span>
+                        <span id="loop-start-value" class="value-badge">--°</span>
+                    </label>
+                    <div class="loop-control-row">
+                        <input type="range" class="form-range" id="loop-gap-start" min="0" max="360" step="1" value="0">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" data-loop-step="start" data-step="-5" title="Start -5°">-5°</button>
+                            <button type="button" class="btn btn-outline-secondary" data-loop-step="start" data-step="5" title="Start +5°">+5°</button>
+                        </div>
+                    </div>
+
+                    <label class="form-label d-flex justify-content-between align-items-center">
+                        <span>Gap end</span>
+                        <span id="loop-end-value" class="value-badge">--°</span>
+                    </label>
+                    <div class="loop-control-row">
+                        <input type="range" class="form-range" id="loop-gap-end" min="0" max="360" step="1" value="360">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-outline-secondary" data-loop-step="end" data-step="-5" title="End -5°">-5°</button>
+                            <button type="button" class="btn btn-outline-secondary" data-loop-step="end" data-step="5" title="End +5°">+5°</button>
+                        </div>
+                    </div>
+
+                    <div class="loop-metrics">
+                        <span>Arc <span id="loop-arc-value">--°</span></span>
+                        <span>Gap <span id="loop-gap-value">--°</span></span>
+                    </div>
+                    <div class="btn-group btn-group-sm w-100 mt-2" role="group">
+                        <button type="button" class="btn btn-outline-secondary" data-loop-action="full">Full loop</button>
+                        <button type="button" class="btn btn-outline-secondary" data-loop-action="gap60">Open 60° gap</button>
+                        <button type="button" class="btn btn-outline-secondary" data-loop-action="gap180">Half arc</button>
+                    </div>
+                </div>
+            </section>
+
+            <section id="inspector-text-panel" class="inspector-section inspector-type-panel">
+                <p class="section-title">Text Inspector</p>
+                <div id="inspector-text-length" class="inspector-chip mb-2">0 chars</div>
+                <label for="inspector-text-value" class="field-label">Label (plain text or TeX)</label>
+                <textarea id="inspector-text-value" class="qs-textarea" rows="4" placeholder="$\\mathcal{M}$"></textarea>
+                <div class="h-stack mt-2">
+                    <button id="inspector-text-apply" type="button" class="qs-btn primary">Apply Text</button>
+                    <button type="button" class="qs-btn" data-command="mode-string"><i class="bi bi-cursor-text"></i> New Text</button>
+                </div>
+            </section>
+
+            <section id="inspector-group-panel" class="inspector-section inspector-type-panel">
+                <p class="section-title">Group Inspector</p>
+                <div class="inspector-chip mb-2">Grouped selection is active</div>
+                <div class="selection-action-grid">
+                    <button type="button" class="qs-btn" data-command="ungroup-selection" data-selection-required="true"><i class="bi bi-layout-split"></i> Ungroup</button>
+                    <button type="button" class="qs-btn danger" data-command="delete" data-selection-required="true"><i class="bi bi-trash"></i> Delete</button>
+                </div>
+            </section>
+
+            <section id="inspector-vertex-panel" class="inspector-section inspector-type-panel">
+                <p class="section-title">Vertex Inspector</p>
+                <div class="inspector-chip">Drag vertex to rubber-band connected edges.</div>
+            </section>
+
+            <div class="inspector-section selection-common-panel">
+                <p class="section-title">Common Selection Actions</p>
+                <div class="selection-action-grid">
+                    <button type="button" class="qs-btn" data-command="rotation" data-selection-required="true"><i class="bi bi-arrow-clockwise"></i> Rotate CW</button>
+                    <button type="button" class="qs-btn" data-command="anti-rotation" data-selection-required="true"><i class="bi bi-arrow-counterclockwise"></i> Rotate CCW</button>
+                    <button type="button" class="qs-btn" data-command="group-selection" data-selection-required="true"><i class="bi bi-collection"></i> Group</button>
+                    <button type="button" class="qs-btn" data-command="ungroup-selection" data-selection-required="true"><i class="bi bi-layout-split"></i> Ungroup</button>
+                    <button type="button" class="qs-btn" data-command="edit-selection-macro" data-selection-required="true"><i class="bi bi-code-slash"></i> Edit as Macro</button>
+                    <button type="button" class="qs-btn danger" data-command="delete" data-selection-required="true"><i class="bi bi-trash"></i> Delete</button>
+                </div>
+            </div>
+
+            <div class="inspector-section">
+                <p class="section-title">Quick Add At Cursor</p>
+                <div class="selection-action-grid">
+                    <button type="button" class="qs-btn" data-command="add-vertex"><i class="bi bi-plus-circle"></i> Add Vertex</button>
+                    <button type="button" class="qs-btn" data-command="add-loop"><i class="bi bi-bounding-box-circles"></i> Add Loop</button>
+                    <button type="button" class="qs-btn" data-command="add-text"><i class="bi bi-type"></i> Add Text</button>
+                    <button type="button" class="qs-btn" data-command="add-line-from-pointer"><i class="bi bi-arrow-right"></i> Propagator</button>
+                </div>
+            </div>
+
         </div>
+    </aside>
+
+    <div class="floating-dock glass-panel" role="toolbar" aria-label="Drawing tools">
+        <button type="button" class="dock-btn" data-command="mode-normal" data-mode="normal" title="Select"><i class="bi bi-cursor"></i></button>
+        <button type="button" class="dock-btn" data-command="mode-line" data-mode="line" title="Line"><i class="bi bi-bezier"></i></button>
+        <button type="button" class="dock-btn" data-command="mode-loop" data-mode="loop" title="Loop"><i class="bi bi-circle"></i></button>
+        <button type="button" class="dock-btn" data-command="mode-point" data-mode="point" title="Vertex"><i class="bi bi-record-fill"></i></button>
+        <button type="button" class="dock-btn" data-command="mode-string" data-mode="string" title="Text"><i class="bi bi-type"></i></button>
+        <button type="button" class="dock-btn" data-command="select-all" title="Select all"><i class="bi bi-bounding-box"></i></button>
+        <button type="button" class="dock-btn" data-command="copy-selection" data-selection-required="true" title="Copy"><i class="bi bi-copy"></i></button>
+        <button type="button" class="dock-btn" data-command="cut-selection" data-selection-required="true" title="Cut"><i class="bi bi-scissors"></i></button>
+        <button type="button" class="dock-btn" data-command="paste-selection" title="Paste"><i class="bi bi-clipboard-plus"></i></button>
     </div>
 
-    <!-- Footer -->
-    <footer class="position-fixed bottom-0 end-0">
-        <div class="border rounded-pill bg-body-tertiary shadow-sm m-2 px-4 py-1">
-            <a href="https://github.com/KatagiriSo/QuantumSketch" target="_blank" rel="noopener noreferrer" class="-link-secondary text-decoration-none"><small>QuantumSketch ver. 1.1.0 by So Katagiri</small></a>
-        </div>
-    </footer>
+    <div id="canvas-context-menu">
+        <button type="button" class="context-menu-item" data-command="undo"><i class="bi bi-arrow-counterclockwise"></i><span>Undo</span></button>
+        <button type="button" class="context-menu-item" data-command="redo"><i class="bi bi-arrow-clockwise"></i><span>Redo</span></button>
+        <hr>
+        <button type="button" class="context-menu-item" data-command="select-here"><i class="bi bi-cursor"></i><span>Select here</span></button>
+        <button type="button" class="context-menu-item" data-command="sub-select-here"><i class="bi bi-crosshair"></i><span>Set sub-selection</span></button>
+        <button type="button" class="context-menu-item" data-command="select-all"><i class="bi bi-bounding-box"></i><span>Select all</span></button>
+        <button type="button" class="context-menu-item" data-command="copy-selection" data-selection-required="true"><i class="bi bi-copy"></i><span>Copy selection</span></button>
+        <button type="button" class="context-menu-item" data-command="cut-selection" data-selection-required="true"><i class="bi bi-scissors"></i><span>Cut selection</span></button>
+        <button type="button" class="context-menu-item" data-command="paste-selection"><i class="bi bi-clipboard-plus"></i><span>Paste</span></button>
+        <button type="button" class="context-menu-item" data-command="edit-selection-macro" data-selection-required="true"><i class="bi bi-code-slash"></i><span>Edit as macro</span></button>
+        <button type="button" class="context-menu-item" data-command="group-selection" data-selection-required="true"><i class="bi bi-collection"></i><span>Group</span></button>
+        <button type="button" class="context-menu-item" data-command="ungroup-selection" data-selection-required="true"><i class="bi bi-layout-split"></i><span>Ungroup</span></button>
+        <hr>
+        <button type="button" class="context-menu-item" data-command="add-vertex"><i class="bi bi-plus-circle"></i><span>Add vertex</span></button>
+        <button type="button" class="context-menu-item" data-command="add-loop"><i class="bi bi-bounding-box-circles"></i><span>Add loop</span></button>
+        <button type="button" class="context-menu-item" data-command="add-line-from-pointer"><i class="bi bi-arrow-right"></i><span>Propagator start/finish</span></button>
+        <button type="button" class="context-menu-item" data-command="add-text"><i class="bi bi-card-text"></i><span>Add text</span></button>
+        <hr>
+        <button type="button" class="context-menu-item text-danger" data-command="delete" data-selection-required="true"><i class="bi bi-trash"></i><span>Delete selection</span></button>
+    </div>
 
-    <!-- Modal help -->
+    <a href="https://github.com/KatagiriSo/QuantumSketch" target="_blank" rel="noopener noreferrer" class="floating-footer glass-panel">QuantumSketch ver. 1.1.0 by So Katagiri</a>
+
     <div class="modal fade" id="modal-help" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
-
                 <div class="modal-header">
-                    <h2 class="modal-title fs-5">Keyboard shortcuts</h2>
+                    <h2 class="modal-title fs-5">QuantumSketch Help</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-
-                <div class="modal-body">
-                    <div class="add">
-                        <p>Select a tool from the left panel before drawing.</p>
-                        <p>Propagator tool: click once to pick a start point, click again to finish the line. Press Esc to cancel.</p>
-                        <p>Vertex tool: click anywhere to add a vertex.</p>
-                        <p>Loop tool: click to place a loop or attach one to the current selection.</p>
-                        <p>Text tool: click to place a label.</p>
-                    </div>
-                    <div class="select">
-                        <p>Select tool: click to select, Shift+click to set the sub selection.</p>
-                        <p>Right-click opens a context menu with select-all, copy, paste, and selection-aware actions.</p>
-                        <p>Use <strong>Edit as macro</strong> from the right-click menu to export selected lines/loops into editable DSL and replace the selection by running the edited script.</p>
-                        <p>Drag on the canvas to draw a selection box; hold Shift to add to the current selection.</p>
-                        <p>Drag a selected element to move the whole selection; Delete removes everything selected.</p>
-                        <p>Hold Alt while dragging to start a marquee even when the pointer is above existing geometry.</p>
-                    </div>
-                    <div class="linestyle">
-                        <p>The Selection actions buttons toggle arrows, cycle styles, rotate arrow heads, and fill loops.</p>
-                        <p>Keep clicking with the propagator tool to chain multiple segments.</p>
-                        <p>While drawing a propagator, nearby vertices show snap feedback and the preview line snaps magnetically.</p>
-                    </div>
-                    <div class="loop">
-                        <p>Use the Loop controls sliders to resize a loop or adjust the missing segment.</p>
-                        <p>The preset buttons quickly restore a full loop or open common gaps.</p>
-                        <p>When a loop is selected, drag the red radius handle on-canvas for direct resize.</p>
-                    </div>
-                    <div class="move">
-                        <p>Use the arrow keys to nudge the selection by one grid unit.</p>
-                        <p>Hold Ctrl / ⌘ while nudging or dragging to move in fine steps.</p>
-                        <p>Press Delete or Backspace to remove the current selection.</p>
-                        <p>Drag a vertex to move all connected lines/loops; hold Alt while dragging a line endpoint to detach from vertex.</p>
-                    </div>
-                    <div class="mode">
-                        <p>Ctrl / ⌘ + Z for undo, Ctrl / ⌘ + Shift + Z or Ctrl / ⌘ + Y for redo.</p>
-                        <p>Ctrl / ⌘ + G groups selection, Ctrl / ⌘ + Shift + G ungroups.</p>
-                        <p>Ctrl / ⌘ + S performs Quick Save to browser local storage (no download dialog).</p>
-                        <p>Ctrl / ⌘ + A selects all, Ctrl / ⌘ + C copies, Ctrl / ⌘ + X cuts, Ctrl / ⌘ + V pastes, Ctrl / ⌘ + E exports SVG text, Ctrl / ⌘ + P exports TikZ.</p>
-                        <p>Mouse wheel zooms. Hold Space and drag to pan the canvas.</p>
-                        <p>Trackpad horizontal two-finger scroll pans the canvas. Two-finger pinch zooms around your fingers.</p>
-                        <p>Press <code>G</code> to toggle grid snap on/off.</p>
-                        <p>Press Esc to cancel a propagator draft and return to the Select tool.</p>
-                        <p>Use the <strong>DSL Studio</strong> panel for paper-quality diagram authoring: quick command, macro builder, and script editor.</p>
-                        <p>Text labels support TeX. Example: <code>$\\int_0^1 x^2 \\, dx$</code> or <code>\\(E=mc^2\\)</code>.</p>
-                        <p>Use <strong>Diagram catalog (editable macro)</strong> to load a template macro into <code>dsl-script</code>, tweak it, and run immediately.</p>
-                        <p>For scripted workflows, write one command per line in <code>dsl-script</code> and run with <code>Ctrl/⌘ + Enter</code> or the Run Script button.</p>
-                        <p>Press <code>/</code> to focus the quick command box (<code>dsl-input</code>), then <code>Enter</code> to execute instantly.</p>
-                    </div>
+                <div class="modal-body help-note">
+                    <p>Canvas-first workflow: use the bottom dock for drawing mode, and the right inspector for direct edits on selected elements.</p>
+                    <p>DSL workflow: press <code>/</code> or click <i class="bi bi-code-slash"></i> to open DSL Studio, run a one-liner in <code>dsl-input</code>, or multi-line scripts in <code>dsl-script</code>.</p>
+                    <p>Direct manipulation: drag vertices to stretch connected lines and loops, with snapping feedback and magnetic join behavior when close.</p>
+                    <p>Shortcuts: Ctrl/⌘ + Z undo, Ctrl/⌘ + Shift + Z or Ctrl/⌘ + Y redo, Ctrl/⌘ + A/C/X/V/G, Ctrl/⌘ + Shift + G ungroup, Ctrl/⌘ + S quick-save, G grid snap toggle.</p>
+                    <p>Navigation: mouse wheel zooms around pointer, two-finger pinch zooms, two-finger drag pans, and hold Space + drag for temporary pan mode.</p>
+                    <p>TeX labels are supported in text tool and macros (for example <code>$\\int_0^1 x^2 dx$</code> or <code>\\(E=mc^2\\)</code>).</p>
                 </div>
-
                 <div class="modal-footer">
-                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal tikz -->
     <div class="modal fade" id="modal-export-tikz" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -703,7 +1173,6 @@
                     <h2 class="modal-title fs-5">Tikz</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-
                 <div class="modal-body">
                     <h3 class="fs-5">Preamble</h3>
                     <div class="border bg-body-tertiary m-2 px-3 py-2 font-monospace">
@@ -715,17 +1184,15 @@
                         \end{document}<br>
                     </div>
                     <h3 class="fs-5">Command</h3>
-                    <div id="output-tikz"class="border bg-body-tertiary m-2 px-3 py-2 font-monospace"></div>
+                    <div id="output-tikz" class="border bg-body-tertiary m-2 px-3 py-2 font-monospace"></div>
                 </div>
-
                 <div class="modal-footer">
-                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Modal SVG -->
     <div class="modal fade" id="modal-export-svg" tabindex="-1">
         <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
             <div class="modal-content">
@@ -733,13 +1200,11 @@
                     <h2 class="modal-title fs-5">SVG</h2>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-
                 <div class="modal-body">
                     <div id="output-svg" class="border bg-body-tertiary m-2 px-3 py-2 font-monospace"></div>
                 </div>
-
                 <div class="modal-footer">
-                   <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -755,9 +1220,54 @@
                 fontCache: 'global'
             }
         };
+
+        (function () {
+            const drawer = document.getElementById('dsl-drawer');
+            const openBtn = document.getElementById('dsl-panel-toggle');
+            const closeBtn = document.getElementById('dsl-panel-close');
+            const inspector = document.getElementById('selection-inspector');
+            const current = document.getElementById('current');
+
+            const setDrawerOpen = (open) => {
+                if (!drawer) {
+                    return;
+                }
+                drawer.classList.toggle('is-open', open);
+                drawer.setAttribute('aria-hidden', open ? 'false' : 'true');
+                openBtn?.setAttribute('aria-expanded', open ? 'true' : 'false');
+            };
+
+            openBtn?.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                const opening = !(drawer?.classList.contains('is-open'));
+                setDrawerOpen(opening);
+            });
+
+            closeBtn?.addEventListener('click', () => setDrawerOpen(false));
+
+            document.addEventListener('keydown', (ev) => {
+                if (ev.key === 'Escape' && drawer?.classList.contains('is-open')) {
+                    setDrawerOpen(false);
+                }
+            });
+
+            const updateInspectorState = () => {
+                if (!inspector || !current) {
+                    return;
+                }
+                const text = current.textContent?.trim() ?? '';
+                const hasSelection = text !== '-' && !text.startsWith('current: -');
+                inspector.classList.toggle('is-empty', !hasSelection);
+            };
+
+            const observer = new MutationObserver(updateInspectorState);
+            if (current) {
+                observer.observe(current, { childList: true, characterData: true, subtree: true });
+            }
+            updateInspectorState();
+        })();
     </script>
     <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     <script src="main.js" async defer></script>
 </body>
-
 </html>

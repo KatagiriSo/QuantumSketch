@@ -1,5 +1,5 @@
 import { config } from "../Config";
-import { Line, isLine } from "../Core/Line";
+import { Line, isLine, LineStyle } from "../Core/Line";
 import { Elem } from "../Core/Elem";
 import { isLoop, Loop } from "../Core/Loop";
 import { isString, MyString } from "../Core/MyString";
@@ -13,7 +13,7 @@ import { DrawContext } from "./DrawContext";
 import { DrawMode } from "./DrawMode";
 import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
-import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle, SetLoopRadius, SetLoopBeginAngle, SetLoopEndAngle, SetLoopAngles, MoveGroup, DeleteGroup, SetLineEndpoint, SetLineControlPoint, RotateArrow, SetArrowRotation, GroupSelection, UngroupSelection } from "./RepositoryCommand";
+import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle, SetLoopRadius, SetLoopBeginAngle, SetLoopEndAngle, SetLoopAngles, MoveGroup, DeleteGroup, SetLineEndpoint, SetLineControlPoint, RotateArrow, SetArrowRotation, GroupSelection, UngroupSelection, SetLineStyle, SetLoopStyle, SetLineLabel, SetLoopLabel, SetStringLabel } from "./RepositoryCommand";
 import { CommandRegistry, CommandHost } from "./CommandRegistry";
 import { LineToolState, LoopToolState, PointToolState, SelectToolState, StringToolState, ToolState } from "./ToolState";
 
@@ -86,6 +86,24 @@ export class RDDraw implements CommandHost {
     endValue: null as HTMLElement | null,
     arcValue: null as HTMLElement | null,
     gapValue: null as HTMLElement | null,
+  };
+  private inspectorControls = {
+    root: null as HTMLElement | null,
+    selectionType: null as HTMLElement | null,
+    selectionCount: null as HTMLElement | null,
+    lineLength: null as HTMLElement | null,
+    lineArrow: null as HTMLElement | null,
+    lineStyle: null as HTMLSelectElement | null,
+    lineLabel: null as HTMLInputElement | null,
+    lineApply: null as HTMLButtonElement | null,
+    lineStraighten: null as HTMLButtonElement | null,
+    loopStyle: null as HTMLSelectElement | null,
+    loopLabel: null as HTMLInputElement | null,
+    loopApply: null as HTMLButtonElement | null,
+    loopState: null as HTMLElement | null,
+    textValue: null as HTMLTextAreaElement | null,
+    textApply: null as HTMLButtonElement | null,
+    textLength: null as HTMLElement | null,
   };
   private loopPreview?: {
     loopId: string;
@@ -273,6 +291,7 @@ export class RDDraw implements CommandHost {
     this.initializeCommandTriggers();
     this.setupContextMenu();
     this.setupLoopControls();
+    this.setupInspectorControls();
     this.setupScriptInput();
     this.setupTemplatePresets();
     this.resizeCanvasToViewport();
@@ -1152,7 +1171,7 @@ export class RDDraw implements CommandHost {
       return;
     }
 
-    if (isLine(current)) {
+    if (current && isLine(current)) {
       const loop = new Loop();
       loop.origin = current.to.add(current.directionUnit().multi(loop.radius * 2));
       this.repository.doCommand(new SetLoop(loop));
@@ -1302,6 +1321,237 @@ export class RDDraw implements CommandHost {
           this.handleLoopAction(action);
         });
       });
+  }
+
+  private setupInspectorControls() {
+    this.inspectorControls.root = document.getElementById("selection-inspector");
+    this.inspectorControls.selectionType = document.getElementById("inspector-selection-type");
+    this.inspectorControls.selectionCount = document.getElementById("inspector-selection-count");
+    this.inspectorControls.lineLength = document.getElementById("inspector-line-length");
+    this.inspectorControls.lineArrow = document.getElementById("inspector-line-arrow");
+    this.inspectorControls.lineStyle = document.getElementById("inspector-line-style") as HTMLSelectElement | null;
+    this.inspectorControls.lineLabel = document.getElementById("inspector-line-label") as HTMLInputElement | null;
+    this.inspectorControls.lineApply = document.getElementById("inspector-line-label-apply") as HTMLButtonElement | null;
+    this.inspectorControls.lineStraighten = document.getElementById("inspector-line-straighten") as HTMLButtonElement | null;
+    this.inspectorControls.loopStyle = document.getElementById("inspector-loop-style") as HTMLSelectElement | null;
+    this.inspectorControls.loopLabel = document.getElementById("inspector-loop-label") as HTMLInputElement | null;
+    this.inspectorControls.loopApply = document.getElementById("inspector-loop-label-apply") as HTMLButtonElement | null;
+    this.inspectorControls.loopState = document.getElementById("inspector-loop-state");
+    this.inspectorControls.textValue = document.getElementById("inspector-text-value") as HTMLTextAreaElement | null;
+    this.inspectorControls.textApply = document.getElementById("inspector-text-apply") as HTMLButtonElement | null;
+    this.inspectorControls.textLength = document.getElementById("inspector-text-length");
+
+    this.inspectorControls.lineStyle?.addEventListener("change", () => {
+      const line = this.currentLineSelection();
+      const style = this.parseLineStyle(this.inspectorControls.lineStyle?.value ?? "");
+      if (!line || !style || line.style === style) {
+        return;
+      }
+      this.repository.doCommand(new SetLineStyle(line, style));
+      this.drawAll();
+    });
+
+    this.inspectorControls.loopStyle?.addEventListener("change", () => {
+      const loop = this.currentLoop();
+      const style = this.parseLoopStyle(this.inspectorControls.loopStyle?.value ?? "");
+      if (!loop || !style || loop.style === style) {
+        return;
+      }
+      this.repository.doCommand(new SetLoopStyle(loop, style));
+      this.drawAll();
+    });
+
+    this.inspectorControls.lineApply?.addEventListener("click", () => {
+      this.commitInspectorLineLabel();
+    });
+    this.inspectorControls.lineLabel?.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") {
+        return;
+      }
+      ev.preventDefault();
+      this.commitInspectorLineLabel();
+    });
+
+    this.inspectorControls.loopApply?.addEventListener("click", () => {
+      this.commitInspectorLoopLabel();
+    });
+    this.inspectorControls.loopLabel?.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Enter") {
+        return;
+      }
+      ev.preventDefault();
+      this.commitInspectorLoopLabel();
+    });
+
+    this.inspectorControls.textApply?.addEventListener("click", () => {
+      this.commitInspectorTextLabel();
+    });
+    this.inspectorControls.textValue?.addEventListener("keydown", (ev) => {
+      if (!(ev.metaKey || ev.ctrlKey) || ev.key !== "Enter") {
+        return;
+      }
+      ev.preventDefault();
+      this.commitInspectorTextLabel();
+    });
+
+    this.inspectorControls.lineStraighten?.addEventListener("click", () => {
+      const line = this.currentLineSelection();
+      if (!line || !line.control) {
+        return;
+      }
+      this.repository.doCommand(new SetLineControlPoint(line, null));
+      this.drawAll();
+    });
+  }
+
+  private parseLineStyle(value: string): LineStyle | undefined {
+    if (value === "normal" || value === "dash" || value === "wave" || value === "coil" || value === "double") {
+      return value;
+    }
+    return undefined;
+  }
+
+  private parseLoopStyle(value: string): LineStyle | undefined {
+    if (value === "normal" || value === "dash" || value === "wave" || value === "coil") {
+      return value;
+    }
+    return undefined;
+  }
+
+  private currentLineSelection(): Line | undefined {
+    const current = this.repository.currentElement();
+    if (current && isLine(current)) {
+      return current;
+    }
+    return undefined;
+  }
+
+  private currentStringSelection(): MyString | undefined {
+    const current = this.repository.currentElement();
+    if (current && isString(current)) {
+      return current;
+    }
+    return undefined;
+  }
+
+  private commitInspectorLineLabel() {
+    const line = this.currentLineSelection();
+    const input = this.inspectorControls.lineLabel;
+    if (!line || !input) {
+      return;
+    }
+    const next = input.value;
+    if (line.label === next) {
+      return;
+    }
+    this.repository.doCommand(new SetLineLabel(line, next));
+    this.drawAll();
+  }
+
+  private commitInspectorLoopLabel() {
+    const loop = this.currentLoop();
+    const input = this.inspectorControls.loopLabel;
+    if (!loop || !input) {
+      return;
+    }
+    const next = input.value;
+    if (loop.label === next) {
+      return;
+    }
+    this.repository.doCommand(new SetLoopLabel(loop, next));
+    this.drawAll();
+  }
+
+  private commitInspectorTextLabel() {
+    const text = this.currentStringSelection();
+    const input = this.inspectorControls.textValue;
+    if (!text || !input) {
+      return;
+    }
+    const next = input.value;
+    if (text.label === next) {
+      return;
+    }
+    this.repository.doCommand(new SetStringLabel(text, next));
+    this.drawAll();
+  }
+
+  private updateInspectorControlsUI(current?: Elem) {
+    const controls = this.inspectorControls;
+    const root = controls.root;
+    if (!root) {
+      return;
+    }
+
+    const selectedCount = this.repository.getSelectedElements().length;
+    if (controls.selectionCount) {
+      controls.selectionCount.textContent = selectedCount > 0 ? `${selectedCount} selected` : "No selection";
+    }
+
+    let kind: "none" | "line" | "loop" | "string" | "vertex" | "group" | "elem" = "none";
+    let label = "No selection";
+    if (current) {
+      if (isLine(current)) {
+        kind = "line";
+        label = "Line";
+      } else if (isLoop(current)) {
+        kind = "loop";
+        label = "Loop";
+      } else if (isString(current)) {
+        kind = "string";
+        label = "Text";
+      } else if (isVector(current)) {
+        kind = "vertex";
+        label = "Vertex";
+      } else if (isGroup(current)) {
+        kind = "group";
+        label = "Group";
+      } else {
+        kind = "elem";
+        label = "Element";
+      }
+    }
+    root.dataset.selectionKind = kind;
+    root.classList.toggle("is-empty", kind === "none");
+    if (controls.selectionType) {
+      controls.selectionType.textContent = label;
+    }
+
+    if (current && isLine(current)) {
+      if (controls.lineLength) {
+        controls.lineLength.textContent = current.length().toFixed(2);
+      }
+      if (controls.lineArrow) {
+        controls.lineArrow.textContent = current.allow ? "on" : "off";
+      }
+      if (controls.lineStyle && document.activeElement !== controls.lineStyle) {
+        controls.lineStyle.value = current.style;
+      }
+      if (controls.lineLabel && document.activeElement !== controls.lineLabel) {
+        controls.lineLabel.value = current.label ?? "";
+      }
+    }
+
+    if (current && isLoop(current)) {
+      if (controls.loopStyle && document.activeElement !== controls.loopStyle) {
+        controls.loopStyle.value = this.parseLoopStyle(current.style) ?? "normal";
+      }
+      if (controls.loopLabel && document.activeElement !== controls.loopLabel) {
+        controls.loopLabel.value = current.label ?? "";
+      }
+      if (controls.loopState) {
+        controls.loopState.textContent = `arrow ${current.allow ? "on" : "off"} / fill ${current.fill ? "on" : "off"}`;
+      }
+    }
+
+    if (current && isString(current)) {
+      if (controls.textValue && document.activeElement !== controls.textValue) {
+        controls.textValue.value = current.label;
+      }
+      if (controls.textLength) {
+        controls.textLength.textContent = `${current.label.length} chars`;
+      }
+    }
   }
 
   private showContextMenu(clientX: number, clientY: number) {
@@ -2826,6 +3076,9 @@ export class RDDraw implements CommandHost {
 
     const current = this.repository.currentElement();
     this.updateLoopControlsUI(current);
+    if (exportType === "canvas") {
+      this.updateInspectorControlsUI(current);
+    }
 
     if (this.isNoSelectMode) {
       return;
@@ -2868,6 +3121,8 @@ export class RDDraw implements CommandHost {
     if (sub) {
       draw(this.drawContext, sub, "canvas", "sub");
       this.drawContext.output("sub:   " + sub.description(), "html", "sub");
+    } else {
+      this.drawContext.output("sub:   -", "html", "sub");
     }
 
     if (current) {
@@ -2879,6 +3134,8 @@ export class RDDraw implements CommandHost {
         "html",
         "current"
       );
+    } else {
+      this.drawContext.output("current: -", "html", "current");
     }
 
     this.drawContext.output(this.describeMode(), "html", "mode");
