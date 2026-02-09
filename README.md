@@ -8,11 +8,6 @@ QuantumSketch is an HTML5 Canvas based Feynman diagram editor.
 - Export to TikZ / SVG
 - Undo / Redo and clipboard operations
 
-![Demo mov](demo.gif)
-![Demo2 mov](demo2.gif)
-![sample png](sample.png)
-![sample2 png](sample2.png)
-![sample3 png](sample3.png)
 
 ## Live Demo
 
