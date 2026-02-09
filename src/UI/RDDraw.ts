@@ -15,6 +15,7 @@ import { ExportType } from "./ExportType";
 import { RDRepository } from "./RDRepository";
 import { SetString, SetVertex, SetLoop, SetLine, Delete, Move, Rotation, ChangeScale, ChangeArcAngle, ChangeArcEndAngle, Fill, ArrowToggle, ChangeType, ChangeStyle, SetLoopRadius, SetLoopBeginAngle, SetLoopEndAngle, SetLoopAngles, MoveGroup, DeleteGroup, SetLineEndpoint, SetLineControlPoint, RotateArrow, SetArrowRotation, GroupSelection, UngroupSelection } from "./RepositoryCommand";
 import { CommandRegistry, CommandHost } from "./CommandRegistry";
+import { LineToolState, LoopToolState, PointToolState, SelectToolState, StringToolState, ToolState } from "./ToolState";
 
 type InteractionState =
   | {
@@ -29,6 +30,29 @@ type InteractionState =
     }
   | {
       type: "dragging";
+    };
+
+type HitResult =
+  | {
+      type: "line-handle";
+      line: Line;
+      handle: "origin" | "to" | "control";
+      position: Vector;
+      createControl: boolean;
+    }
+  | {
+      type: "loop-handle";
+      loop: Loop;
+      handle: "radius" | "start" | "end";
+      position: Vector;
+    }
+  | {
+      type: "vertex";
+      vertex: Vertex;
+    }
+  | {
+      type: "edge";
+      elem: Elem;
     };
 
 /**
@@ -96,18 +120,39 @@ export class RDDraw implements CommandHost {
     | {
         type: "loop-handle";
         loop: Loop;
-        handle: "radius";
+        handle: "radius" | "start" | "end";
         startPointer: Vector;
         startRadius: number;
+        startBeginAngle: number;
+        startEndAngle: number;
       };
   private selectionRect?: { x1: number; y1: number; x2: number; y2: number };
   private interactionState: InteractionState = { type: "idle" };
   private linePreviewEnd?: Vector;
   private hoveredSnapVertex?: Vector;
   private hoveredSnapGrid?: Vector;
+  private hoveredHit?: HitResult | null;
+  private cursorMode: "default" | "grab" | "grabbing" | "crosshair" | "pointer" = "default";
+  private lineToolPress?: {
+    startPointer: Vector;
+    startVertex: Vector;
+    didDrag: boolean;
+  };
   private spacePanActive = false;
   private panDragLast?: Vector;
+  private activePointers: Map<number, Vector> = new Map();
+  private pointerGesture?: {
+    pointerIds: [number, number];
+    lastMidRaw: Vector;
+    lastDistance: number;
+  };
+  private interactionPointerId?: number;
+  private gridSnapEnabled = true;
+  private readonly tools: Record<DrawMode, ToolState>;
+  private activeTool: ToolState;
+  private pointerTool?: ToolState;
   private lastHitContext?: { point: Vector; tolerance: number };
+  private renderScheduled = false;
   private clipboardSnapshot?: {
     vertices: Array<{ id: string; x: number; y: number }>;
     lines: Array<{
@@ -145,26 +190,36 @@ export class RDDraw implements CommandHost {
     this.context = canvas.getContext("2d")!;
     this.drawContext = drawContext;
     this.scriptEngine = new ScriptEngine(this.repository);
+    this.tools = {
+      normal: new SelectToolState(),
+      line: new LineToolState(),
+      loop: new LoopToolState(),
+      point: new PointToolState(),
+      string: new StringToolState(),
+    };
+    this.activeTool = this.tools[this.drawMode];
     this.registerCommands();
     this.bind();
     this.drawAll();
   }
 
   bind() {
+    this.canvas.style.touchAction = "none";
     this.canvas.addEventListener("dblclick", (ev) => {
       this.onCanvasDoubleClick(ev);
     });
 
-    this.canvas.addEventListener("mousedown", (ev) => {
-      this.mouseDown(ev);
+    this.canvas.addEventListener("pointerdown", (ev) => {
+      this.onCanvasPointerDown(ev);
     });
-
-    this.canvas.addEventListener("mouseup", (ev) => {
-      this.mouseUp(ev);
+    this.canvas.addEventListener("pointermove", (ev) => {
+      this.onCanvasPointerMove(ev);
     });
-
-    this.canvas.addEventListener("mousemove", (ev) => {
-      this.move(ev);
+    this.canvas.addEventListener("pointerup", (ev) => {
+      this.onCanvasPointerUp(ev);
+    });
+    this.canvas.addEventListener("pointercancel", (ev) => {
+      this.onCanvasPointerCancel(ev);
     });
 
     document.addEventListener("keydown", (ev) => {
@@ -176,6 +231,17 @@ export class RDDraw implements CommandHost {
     this.canvas.addEventListener("wheel", (ev) => {
       this.onCanvasWheel(ev);
     }, { passive: false });
+    window.addEventListener("blur", () => {
+      this.clearTransientInputState();
+    });
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") {
+        this.clearTransientInputState();
+      }
+    });
+    window.addEventListener(DrawContext.TEX_READY_EVENT, () => {
+      this.drawAll();
+    });
     window.addEventListener("resize", () => {
       this.resizeCanvasToViewport();
     });
@@ -843,8 +909,7 @@ export class RDDraw implements CommandHost {
 
   private selectAt(point: Vector, additive: boolean) {
     this.resetLoopPreview();
-    const currentId = this.repository.currentElement()?.id;
-    const hit = this.repository.findElement(point, currentId, this.worldTolerance(12));
+    const hit = this.repository.hitTest(point, config.scale, 14);
     if (!hit) {
       if (!additive) {
         this.repository.clearSelectMode();
@@ -860,11 +925,11 @@ export class RDDraw implements CommandHost {
     this.drawAll();
   }
 
-  private performMoveDrag(pointer: Vector) {
+  private performMoveDrag(pointer: Vector, fineFactor = 1) {
     if (!this.dragSession || this.dragSession.type !== "move") {
       return;
     }
-    const deltaStep = pointer.minus(this.dragSession.lastPointer);
+    const deltaStep = pointer.minus(this.dragSession.lastPointer).multi(fineFactor);
     if (deltaStep.x === 0 && deltaStep.y === 0) {
       return;
     }
@@ -876,6 +941,19 @@ export class RDDraw implements CommandHost {
     this.dragSession.elements.forEach((elem) => {
       elem.move(deltaStep);
     });
+    this.drawAll();
+  }
+
+  private nudgeSelection(delta: Vector) {
+    const selected = this.repository.getSelectedElements();
+    if (selected.length === 0) {
+      return;
+    }
+    if (selected.length === 1) {
+      this.repository.doCommand(new Move(selected[0], delta));
+    } else {
+      this.repository.doCommand(new MoveGroup(selected, delta));
+    }
     this.drawAll();
   }
 
@@ -1046,6 +1124,9 @@ export class RDDraw implements CommandHost {
   }
 
   private snapToGrid(point: Vector): Vector {
+    if (!this.gridSnapEnabled) {
+      return point.copy();
+    }
     const grid = 0.5;
     const snapped = new Vector(
       Math.round(point.x / grid) * grid,
@@ -1092,10 +1173,11 @@ export class RDDraw implements CommandHost {
   }
 
   private cancelLineDraft() {
-    if (!this.lineDraftStart) {
+    if (!this.lineDraftStart && !this.lineToolPress) {
       return;
     }
     this.lineDraftStart = undefined;
+    this.lineToolPress = undefined;
     this.linePreviewEnd = undefined;
     this.drawAll();
   }
@@ -1275,10 +1357,13 @@ export class RDDraw implements CommandHost {
   setDrawMode(mode: DrawMode) {
     this.resetLoopPreview();
     this.drawMode = mode;
+    this.activeTool = this.tools[mode];
     if (mode !== "line") {
       this.lineDraftStart = undefined;
+      this.lineToolPress = undefined;
       this.linePreviewEnd = undefined;
     }
+    this.updateCursor();
     this.drawAll();
   }
 
@@ -1384,15 +1469,41 @@ export class RDDraw implements CommandHost {
     return new Vector(loop.origin.x + loop.radius, loop.origin.y);
   }
 
-  private hitTestLoopHandle(point: Vector): { loop: Loop; handle: "radius" } | null {
+  private loopStartAngleHandlePoint(loop: Loop): Vector {
+    return new Vector(
+      loop.origin.x + Math.cos(loop.loopBeginAngle) * loop.radius,
+      loop.origin.y + Math.sin(loop.loopBeginAngle) * loop.radius
+    );
+  }
+
+  private loopEndAngleHandlePoint(loop: Loop): Vector {
+    return new Vector(
+      loop.origin.x + Math.cos(loop.loopEndAngle) * loop.radius,
+      loop.origin.y + Math.sin(loop.loopEndAngle) * loop.radius
+    );
+  }
+
+  private hitTestLoopHandle(point: Vector): { loop: Loop; handle: "radius" | "start" | "end"; position: Vector } | null {
     const loop = this.activeLoop();
     if (!loop) {
       return null;
     }
-    const handlePoint = this.loopRadiusHandlePoint(loop);
-    const distance = point.minus(handlePoint).length();
-    if (distance <= this.worldTolerance(10)) {
-      return { loop, handle: "radius" };
+    const handles = [
+      { handle: "radius" as const, position: this.loopRadiusHandlePoint(loop) },
+      { handle: "start" as const, position: this.loopStartAngleHandlePoint(loop) },
+      { handle: "end" as const, position: this.loopEndAngleHandlePoint(loop) },
+    ];
+    let nearest: { loop: Loop; handle: "radius" | "start" | "end"; position: Vector } | null = null;
+    let min = Number.POSITIVE_INFINITY;
+    handles.forEach((item) => {
+      const distance = point.minus(item.position).length();
+      if (distance < min) {
+        min = distance;
+        nearest = { loop, handle: item.handle, position: item.position };
+      }
+    });
+    if (nearest && min <= this.worldTolerance(10)) {
+      return nearest;
     }
     return null;
   }
@@ -1458,19 +1569,58 @@ export class RDDraw implements CommandHost {
     const ctx = this.context;
     const scale = config.scale;
     const offset = this.drawContext.getViewOffset();
-    const point = this.loopRadiusHandlePoint(loop);
+    const handles = [
+      { handle: "radius" as const, point: this.loopRadiusHandlePoint(loop), fill: "rgba(220, 53, 69, 0.85)" },
+      { handle: "start" as const, point: this.loopStartAngleHandlePoint(loop), fill: "rgba(255, 193, 7, 0.92)" },
+      { handle: "end" as const, point: this.loopEndAngleHandlePoint(loop), fill: "rgba(25, 135, 84, 0.92)" },
+    ];
+
+    handles.forEach((item) => {
+      const px = (item.point.x + offset.x) * scale;
+      const py = (item.point.y + offset.y) * scale;
+      const isHover =
+        this.hoveredHit?.type === "loop-handle" &&
+        this.hoveredHit.loop.id === loop.id &&
+        this.hoveredHit.handle === item.handle;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(px, py, isHover ? 7.5 : 6, 0, Math.PI * 2);
+      ctx.fillStyle = item.fill;
+      ctx.strokeStyle = "white";
+      ctx.lineWidth = isHover ? 2 : 1.5;
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    });
+  }
+
+  private drawHoverFeedback() {
+    const hit = this.hoveredHit;
+    if (!hit) {
+      return;
+    }
+    if (hit.type === "vertex") {
+      draw(this.drawContext, hit.vertex, "canvas", "sub");
+      return;
+    }
+    if (hit.type === "edge") {
+      draw(this.drawContext, hit.elem, "canvas", "sub");
+      return;
+    }
+
+    const point = hit.position;
+    const scale = config.scale;
+    const offset = this.drawContext.getViewOffset();
     const px = (point.x + offset.x) * scale;
     const py = (point.y + offset.y) * scale;
-
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(px, py, 6, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(220, 53, 69, 0.85)";
-    ctx.strokeStyle = "white";
-    ctx.lineWidth = 1.5;
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
+    this.context.save();
+    this.context.beginPath();
+    this.context.arc(px, py, 8, 0, Math.PI * 2);
+    this.context.strokeStyle = "rgba(13,110,253,0.95)";
+    this.context.lineWidth = 2;
+    this.context.stroke();
+    this.context.restore();
   }
 
   setPrevXY(eventX: number, eventY: number) {
@@ -1478,8 +1628,76 @@ export class RDDraw implements CommandHost {
     // loggerVer(`rawPointer ${this.rawPointer.x}  ${this.rawPointer.y}`);
   }
 
+  private effectiveDrawMode(ev?: MouseEvent): DrawMode {
+    if (!ev) {
+      return this.drawMode;
+    }
+    if ((ev.ctrlKey || ev.metaKey) && this.drawMode !== "normal") {
+      return "normal";
+    }
+    return this.drawMode;
+  }
+
   private worldTolerance(px = 10): number {
     return px / Math.max(config.scale, 0.0001);
+  }
+
+  private hitTestPriority(point: Vector, precisePoint: Vector): HitResult | null {
+    const vertex = this.repository.findNearestVertex(point, this.worldTolerance(14));
+    if (vertex) {
+      return { type: "vertex", vertex };
+    }
+
+    const lineHandleHit = this.hitTestLineHandle(precisePoint);
+    if (lineHandleHit) {
+      return {
+        type: "line-handle",
+        line: lineHandleHit.line,
+        handle: lineHandleHit.handle,
+        position: lineHandleHit.position,
+        createControl: lineHandleHit.createControl,
+      };
+    }
+    const loopHandleHit = this.hitTestLoopHandle(precisePoint);
+    if (loopHandleHit) {
+      return {
+        type: "loop-handle",
+        loop: loopHandleHit.loop,
+        handle: loopHandleHit.handle,
+        position: loopHandleHit.position,
+      };
+    }
+    const edge = this.repository.findNearestEdge(point, this.worldTolerance(14));
+    if (edge) {
+      return { type: "edge", elem: edge };
+    }
+    return null;
+  }
+
+  private updateHoverState(point: Vector, precisePoint: Vector): void {
+    this.hoveredHit = this.hitTestPriority(point, precisePoint);
+  }
+
+  private updateCursor(): void {
+    let next: "default" | "grab" | "grabbing" | "crosshair" | "pointer" = "default";
+    if (this.pointerGesture || this.panDragLast || this.spacePanActive) {
+      next = this.panDragLast || this.pointerGesture ? "grabbing" : "grab";
+    } else if (this.drawMode === "line") {
+      next = "crosshair";
+    } else if (this.dragSession) {
+      next = "grabbing";
+    } else if (this.hoveredHit) {
+      if (this.hoveredHit.type === "edge" || this.hoveredHit.type === "vertex") {
+        next = "grab";
+      } else {
+        next = "pointer";
+      }
+    }
+    if (this.cursorMode === next) {
+      return;
+    }
+    this.cursorMode = next;
+    this.canvas.style.cursor = next;
   }
 
   private resizeCanvasToViewport() {
@@ -1499,6 +1717,18 @@ export class RDDraw implements CommandHost {
 
   private onCanvasWheel(ev: WheelEvent) {
     ev.preventDefault();
+    this.setPrevXY(ev.offsetX, ev.offsetY);
+
+    const panByTrackpad = Math.abs(ev.deltaX) > Math.abs(ev.deltaY) * 0.8 && !ev.ctrlKey && !ev.metaKey;
+    if (panByTrackpad) {
+      const offset = this.drawContext.getViewOffset();
+      this.drawContext.setViewOffset(
+        offset.add(new Vector(-ev.deltaX / config.scale, -ev.deltaY / config.scale))
+      );
+      this.drawAll();
+      return;
+    }
+
     const before = this.getPointerPrecise();
     const factor = ev.deltaY < 0 ? 1.08 : 1 / 1.08;
     const nextScale = Math.max(4, Math.min(80, config.scale * factor));
@@ -1513,6 +1743,212 @@ export class RDDraw implements CommandHost {
     this.drawAll();
   }
 
+  private getRawPointFromClient(clientX: number, clientY: number): Vector {
+    const rect = this.canvas.getBoundingClientRect();
+    const scaleX = rect.width > 0 ? this.canvas.width / rect.width : 1;
+    const scaleY = rect.height > 0 ? this.canvas.height / rect.height : 1;
+    return new Vector(
+      (clientX - rect.left) * scaleX,
+      (clientY - rect.top) * scaleY
+    );
+  }
+
+  private pointerToMouseEvent(ev: PointerEvent, raw: Vector): MouseEvent {
+    return {
+      altKey: ev.altKey,
+      ctrlKey: ev.ctrlKey,
+      metaKey: ev.metaKey,
+      shiftKey: ev.shiftKey,
+      button: ev.button,
+      buttons: ev.buttons,
+      offsetX: raw.x,
+      offsetY: raw.y,
+    } as unknown as MouseEvent;
+  }
+
+  private beginPointerGestureFromActivePointers(): boolean {
+    if (this.activePointers.size < 2) {
+      return false;
+    }
+    const entries = Array.from(this.activePointers.entries()).slice(0, 2);
+    const [id1, p1] = entries[0];
+    const [id2, p2] = entries[1];
+    this.pointerGesture = {
+      pointerIds: [id1, id2],
+      lastMidRaw: new Vector((p1.x + p2.x) / 2, (p1.y + p2.y) / 2),
+      lastDistance: Math.max(1, p1.minus(p2).length()),
+    };
+    this.interactionPointerId = undefined;
+    this.pointerTool = undefined;
+    this.interactionState = { type: "idle" };
+    this.dragSession = undefined;
+    this.selectionRect = undefined;
+    this.panDragLast = undefined;
+    return true;
+  }
+
+  private updatePointerGestureFromActivePointers(): boolean {
+    if (!this.pointerGesture) {
+      return false;
+    }
+    const [id1, id2] = this.pointerGesture.pointerIds;
+    const p1 = this.activePointers.get(id1);
+    const p2 = this.activePointers.get(id2);
+    if (!p1 || !p2) {
+      return false;
+    }
+    const midRaw = new Vector((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    const distance = Math.max(1, p1.minus(p2).length());
+
+    const currentOffset = this.drawContext.getViewOffset();
+    const beforeScale = config.scale;
+    const scaleRatio = distance / Math.max(1, this.pointerGesture.lastDistance);
+    const nextScale = Math.max(4, Math.min(80, beforeScale * scaleRatio));
+
+    let nextOffset = currentOffset;
+    if (Math.abs(nextScale - beforeScale) > 1e-6) {
+      const anchorWorldBefore = this.rawToWorld(midRaw, beforeScale, currentOffset);
+      const anchorWorldAfter = this.rawToWorld(midRaw, nextScale, currentOffset);
+      config.scale = nextScale;
+      nextOffset = currentOffset.add(anchorWorldBefore.minus(anchorWorldAfter));
+    }
+
+    const deltaRaw = midRaw.minus(this.pointerGesture.lastMidRaw);
+    nextOffset = nextOffset.add(new Vector(deltaRaw.x / config.scale, deltaRaw.y / config.scale));
+    this.drawContext.setViewOffset(nextOffset);
+
+    this.pointerGesture.lastMidRaw = midRaw;
+    this.pointerGesture.lastDistance = distance;
+    this.drawAll();
+    return true;
+  }
+
+  private rawToWorld(raw: Vector, scale: number, offset: Vector): Vector {
+    return raw.multi(1 / scale).minus(offset);
+  }
+
+  private onCanvasPointerDown(ev: PointerEvent) {
+    const raw = this.getRawPointFromClient(ev.clientX, ev.clientY);
+    this.setPrevXY(raw.x, raw.y);
+    this.activePointers.set(ev.pointerId, raw);
+    if (ev.pointerType !== "mouse") {
+      ev.preventDefault();
+    }
+    if (this.canvas.setPointerCapture) {
+      this.canvas.setPointerCapture(ev.pointerId);
+    }
+
+    if (this.beginPointerGestureFromActivePointers()) {
+      this.updateCursor();
+      return;
+    }
+
+    this.interactionPointerId = ev.pointerId;
+    const mouseLike = this.pointerToMouseEvent(ev, raw);
+    this.mouseDown(mouseLike);
+    this.updateCursor();
+  }
+
+  private onCanvasPointerMove(ev: PointerEvent) {
+    const raw = this.getRawPointFromClient(ev.clientX, ev.clientY);
+    this.setPrevXY(raw.x, raw.y);
+    if (this.activePointers.has(ev.pointerId)) {
+      this.activePointers.set(ev.pointerId, raw);
+    }
+
+    if (this.pointerGesture) {
+      if (!this.updatePointerGestureFromActivePointers()) {
+        this.pointerGesture = undefined;
+      }
+      if (ev.pointerType !== "mouse") {
+        ev.preventDefault();
+      }
+      this.updateCursor();
+      return;
+    }
+
+    if (this.interactionPointerId !== undefined && ev.pointerId !== this.interactionPointerId) {
+      return;
+    }
+
+    if (this.interactionPointerId === undefined && ev.pointerType !== "mouse" && ev.pointerType !== "pen") {
+      return;
+    }
+
+    const mouseLike = this.pointerToMouseEvent(ev, raw);
+    this.move(mouseLike);
+    if (ev.pointerType !== "mouse") {
+      ev.preventDefault();
+    }
+    this.updateCursor();
+  }
+
+  private onCanvasPointerUp(ev: PointerEvent) {
+    const raw = this.getRawPointFromClient(ev.clientX, ev.clientY);
+    this.setPrevXY(raw.x, raw.y);
+    this.activePointers.delete(ev.pointerId);
+    if (this.canvas.releasePointerCapture) {
+      try {
+        this.canvas.releasePointerCapture(ev.pointerId);
+      } catch {
+        // no-op
+      }
+    }
+
+    if (this.pointerGesture) {
+      if (this.beginPointerGestureFromActivePointers()) {
+        this.updateCursor();
+        return;
+      }
+      this.pointerGesture = undefined;
+      this.pointerTool = undefined;
+      this.interactionPointerId = undefined;
+      this.updateCursor();
+      return;
+    }
+
+    if (this.interactionPointerId !== undefined && ev.pointerId === this.interactionPointerId) {
+      const mouseLike = this.pointerToMouseEvent(ev, raw);
+      this.mouseUp(mouseLike);
+      this.interactionPointerId = undefined;
+      this.activeTool = this.tools[this.drawMode];
+    }
+    if (ev.pointerType !== "mouse") {
+      ev.preventDefault();
+    }
+    this.updateCursor();
+  }
+
+  private onCanvasPointerCancel(ev: PointerEvent) {
+    this.activePointers.delete(ev.pointerId);
+    if (this.interactionPointerId === ev.pointerId) {
+      this.interactionPointerId = undefined;
+      this.pointerTool = undefined;
+      this.interactionState = { type: "idle" };
+      this.dragSession = undefined;
+      this.selectionRect = undefined;
+    }
+    if (this.pointerGesture && this.pointerGesture.pointerIds.includes(ev.pointerId)) {
+      if (!this.beginPointerGestureFromActivePointers()) {
+        this.pointerGesture = undefined;
+      }
+    }
+    this.updateCursor();
+  }
+
+  private clearTransientInputState() {
+    this.spacePanActive = false;
+    this.panDragLast = undefined;
+    this.pointerGesture = undefined;
+    this.activePointers.clear();
+    this.interactionPointerId = undefined;
+    this.pointerTool = undefined;
+    this.interactionState = { type: "idle" };
+    this.dragSession = undefined;
+    this.selectionRect = undefined;
+    this.updateCursor();
+  }
+
   /**
    * Returns the last pointer position in canvas coordinates. Centralises
    * scaling logic so every command receives consistent values regardless of
@@ -1521,7 +1957,7 @@ export class RDDraw implements CommandHost {
   getPointer(): Vector {
     const scale = config.scale;
     const offset = this.drawContext.getViewOffset();
-    const p = this.rawPointer.multi(1 / scale).minus(offset).floor();
+    const p = this.rawPointer.multi(1 / scale).minus(offset);
     // loggerVer(`p ${p.x}  ${p.y}`);
     return p;
   }
@@ -1532,9 +1968,9 @@ export class RDDraw implements CommandHost {
     return this.rawPointer.multi(1 / scale).minus(offset);
   }
 
-  private handleCanvasClick(point: Vector, ev: MouseEvent) {
+  private handleCanvasClickForMode(mode: DrawMode, point: Vector, ev: MouseEvent) {
     this.resetLoopPreview();
-    switch (this.drawMode) {
+    switch (mode) {
       case "normal":
         this.selectAt(point, ev.shiftKey || ev.metaKey || ev.ctrlKey);
         break;
@@ -1551,6 +1987,10 @@ export class RDDraw implements CommandHost {
         this.setString(point.x, point.y);
         break;
     }
+  }
+
+  private handleCanvasClick(point: Vector, ev: MouseEvent) {
+    this.handleCanvasClickForMode(this.effectiveDrawMode(ev), point, ev);
   }
 
   private onCanvasDoubleClick(ev: MouseEvent) {
@@ -1614,8 +2054,9 @@ export class RDDraw implements CommandHost {
     return 3 / Math.max(config.scale, 0.0001);
   }
 
-  private beginPotentialInteraction(point: Vector, ev: MouseEvent) {
-    if (this.drawMode !== "normal") {
+  private beginPotentialInteraction(point: Vector, precisePoint: Vector, ev: MouseEvent, modeOverride?: DrawMode) {
+    const mode = modeOverride ?? this.effectiveDrawMode(ev);
+    if (mode !== "normal") {
       this.interactionState = {
         type: "potentialClick",
         startPointer: point,
@@ -1628,12 +2069,22 @@ export class RDDraw implements CommandHost {
 
     const additive = ev.shiftKey || ev.metaKey || ev.ctrlKey;
     const forceRect = ev.altKey;
-    const hit = this.repository.findElement(point, this.repository.currentElement()?.id, this.worldTolerance(12));
-    if (hit && !this.repository.isSelected(hit)) {
+    const hitResult = this.hitTestPriority(point, precisePoint);
+    const hit = hitResult?.type === "edge"
+      ? hitResult.elem
+      : hitResult?.type === "vertex"
+        ? hitResult.vertex
+        : hitResult?.type === "line-handle"
+          ? hitResult.line
+          : hitResult?.type === "loop-handle"
+            ? hitResult.loop
+            : undefined;
+
+    if (hit && !this.repository.isSelected(hit as Elem)) {
       if (additive) {
-        this.repository.toggleSelection(hit);
+        this.repository.toggleSelection(hit as Elem);
       } else {
-        this.repository.setCurrentElement(hit);
+        this.repository.setCurrentElement(hit as Elem);
       }
       this.drawAll();
     } else if (!hit && !additive) {
@@ -1650,55 +2101,28 @@ export class RDDraw implements CommandHost {
     };
   }
 
-  mouseDown(ev: MouseEvent) {
-    this.setPrevXY(ev.offsetX, ev.offsetY);
-    const point = this.getPointer();
-    const precisePoint = this.getPointerPrecise();
-    this.interactionState = { type: "idle" };
-    this.selectionRect = undefined;
+  private resolveToolForEvent(ev?: MouseEvent): ToolState {
+    return this.tools[this.effectiveDrawMode(ev)];
+  }
 
-    if (this.spacePanActive || ev.button === 1) {
-      this.panDragLast = new Vector(ev.offsetX, ev.offsetY);
+  public dispatchToolMouseDown(mode: DrawMode, point: Vector, precisePoint: Vector, ev: MouseEvent): void {
+    if (mode === "line") {
+      const startVertex = this.lineDraftStart ?? this.resolveLinePoint(point);
+      this.linePreviewEnd = startVertex.copy();
+      this.lineToolPress = {
+        startPointer: point.copy(),
+        startVertex,
+        didDrag: false,
+      };
       this.interactionState = { type: "dragging" };
-      this.dragSession = undefined;
+      this.drawAll();
       return;
     }
 
-    if (this.drawMode === "normal") {
-      const loopHandle = this.hitTestLoopHandle(precisePoint);
-      if (loopHandle) {
-        this.dragSession = {
-          type: "loop-handle",
-          loop: loopHandle.loop,
-          handle: "radius",
-          startPointer: point,
-          startRadius: loopHandle.loop.radius,
-        };
-        this.interactionState = { type: "dragging" };
-        return;
-      }
-
-      const nearVertex = this.findNearestVertex(point, this.worldTolerance(12));
-      if (nearVertex) {
-        if (!this.repository.isSelected(nearVertex)) {
-          this.repository.setCurrentElement(nearVertex);
-          this.drawAll();
-        }
-        const selected = this.repository.getSelectedElements();
-        this.dragSession = {
-          type: "move",
-          elements: selected.length > 0 ? selected : [nearVertex],
-          startPointer: point,
-          lastPointer: point,
-          totalDelta: new Vector(0, 0),
-        };
-        this.interactionState = { type: "dragging" };
-        return;
-      }
-
-      const handleHit = this.hitTestLineHandle(precisePoint);
-      if (handleHit) {
-        const { line, handle, createControl } = handleHit;
+    if (mode === "normal") {
+      const lineHandleHit = this.hitTestLineHandle(precisePoint);
+      if (lineHandleHit) {
+        const { line, handle, createControl } = lineHandleHit;
         if (!this.repository.isSelected(line)) {
           this.repository.setCurrentElement(line);
           this.drawAll();
@@ -1720,20 +2144,69 @@ export class RDDraw implements CommandHost {
         this.interactionState = { type: "dragging" };
         return;
       }
+
+      const loopHandle = this.hitTestLoopHandle(precisePoint);
+      if (loopHandle) {
+        this.dragSession = {
+          type: "loop-handle",
+          loop: loopHandle.loop,
+          handle: loopHandle.handle,
+          startPointer: point,
+          startRadius: loopHandle.loop.radius,
+          startBeginAngle: loopHandle.loop.loopBeginAngle,
+          startEndAngle: loopHandle.loop.loopEndAngle,
+        };
+        this.interactionState = { type: "dragging" };
+        return;
+      }
+
+      const nearVertex = this.findNearestVertex(point, this.worldTolerance(14));
+      if (nearVertex) {
+        if (!this.repository.isSelected(nearVertex)) {
+          this.repository.setCurrentElement(nearVertex);
+          this.drawAll();
+        }
+        const selected = this.repository.getSelectedElements();
+        this.dragSession = {
+          type: "move",
+          elements: selected.length > 0 ? selected : [nearVertex],
+          startPointer: point,
+          lastPointer: point,
+          totalDelta: new Vector(0, 0),
+        };
+        this.interactionState = { type: "dragging" };
+        return;
+      }
     }
-    this.beginPotentialInteraction(point, ev);
+    this.beginPotentialInteraction(point, precisePoint, ev, mode);
   }
 
-  mouseUp(ev: MouseEvent) {
-    this.setPrevXY(ev.offsetX, ev.offsetY);
-    const point = this.getPointer();
+  public dispatchToolMouseUp(mode: DrawMode, point: Vector, precisePoint: Vector, ev: MouseEvent): void {
     const state = this.interactionState;
     this.interactionState = { type: "idle" };
-    this.panDragLast = undefined;
+
+    if (mode === "line" && this.lineToolPress) {
+      const draft = this.lineToolPress;
+      this.lineToolPress = undefined;
+      const distance = point.minus(draft.startPointer).length();
+      if (draft.didDrag || distance > this.dragThresholdCanvas()) {
+        const endPoint = this.resolveLinePoint(point);
+        const line = new Line();
+        line.origin = draft.startVertex;
+        line.to = endPoint;
+        this.repository.doCommand(new SetLine(line));
+        this.lineDraftStart = undefined;
+        this.linePreviewEnd = undefined;
+        this.setDrawMode("normal");
+        return;
+      }
+      this.handleCanvasClickForMode(mode, point, ev);
+      return;
+    }
 
     if (state.type === "potentialClick") {
       this.selectionRect = undefined;
-      this.handleCanvasClick(point, ev);
+      this.handleCanvasClickForMode(mode, point, ev);
       return;
     }
 
@@ -1756,14 +2229,14 @@ export class RDDraw implements CommandHost {
       line.control = initial.control ? initial.control.copy() : null;
 
       if (session.handle === "origin" && !session.detachMode) {
-        const snap = this.repository.findNearestVertex(finalOrigin, this.worldTolerance(12), line.startVertexId);
+        const snap = this.repository.findNearestVertex(finalOrigin, this.worldTolerance(14), line.startVertexId);
         if (snap) {
           finalOrigin = snap;
         }
       }
 
       if (session.handle === "to" && !session.detachMode) {
-        const snap = this.repository.findNearestVertex(finalTo, this.worldTolerance(12), line.endVertexId);
+        const snap = this.repository.findNearestVertex(finalTo, this.worldTolerance(14), line.endVertexId);
         if (snap) {
           finalTo = snap;
         }
@@ -1814,9 +2287,21 @@ export class RDDraw implements CommandHost {
       const session = this.dragSession;
       this.dragSession = undefined;
       const loop = session.loop;
-      const radius = Math.max(1, point.minus(loop.origin).length());
-      if (Math.abs(radius - session.startRadius) > 1e-6) {
-        this.repository.doCommand(new SetLoopRadius(loop, radius));
+      if (session.handle === "radius") {
+        const radius = Math.max(1, point.minus(loop.origin).length());
+        if (Math.abs(radius - session.startRadius) > 1e-6) {
+          this.repository.doCommand(new SetLoopRadius(loop, radius));
+        }
+      } else if (session.handle === "start") {
+        const angle = Math.atan2(point.y - loop.origin.y, point.x - loop.origin.x);
+        if (Math.abs(angle - session.startBeginAngle) > 1e-6) {
+          this.repository.doCommand(new SetLoopBeginAngle(loop, angle));
+        }
+      } else {
+        const angle = Math.atan2(point.y - loop.origin.y, point.x - loop.origin.x);
+        if (Math.abs(angle - session.startEndAngle) > 1e-6) {
+          this.repository.doCommand(new SetLoopEndAngle(loop, angle));
+        }
       }
       this.drawAll();
       return;
@@ -1853,33 +2338,40 @@ export class RDDraw implements CommandHost {
     }
   }
 
-  move(ev: MouseEvent) {
-    // loggerVer(`offset ${ev.offsetX}  ${ev.offsetY}`);
-    // loggerVer(`screen ${ev.screenX}  ${ev.screenY}`);
-    this.setPrevXY(ev.offsetX, ev.offsetY);
-    const pointer = this.getPointer();
-
-    if (this.panDragLast) {
-      const currentRaw = new Vector(ev.offsetX, ev.offsetY);
-      const deltaRaw = currentRaw.minus(this.panDragLast);
-      this.panDragLast = currentRaw;
-      const offset = this.drawContext.getViewOffset();
-      this.drawContext.setViewOffset(
-        offset.add(new Vector(deltaRaw.x / config.scale, deltaRaw.y / config.scale))
-      );
-      this.drawAll();
-      return;
-    }
-
-    if (this.drawMode === "line" && this.lineDraftStart) {
-      this.linePreviewEnd = this.resolveLineHoverPoint(pointer);
-      const nearVertex = this.findNearestVertex(pointer, this.worldTolerance(12));
-      this.hoveredSnapVertex = nearVertex ? nearVertex.copy() : undefined;
-      this.hoveredSnapGrid = nearVertex ? undefined : this.snapToGrid(pointer);
-    } else {
+  public dispatchToolMouseMove(mode: DrawMode, pointer: Vector, precisePoint: Vector, ev: MouseEvent): void {
+    if (mode === "line") {
+      if (this.lineToolPress) {
+        const distance = pointer.minus(this.lineToolPress.startPointer).length();
+        if (distance > this.dragThresholdCanvas()) {
+          this.lineToolPress.didDrag = true;
+        }
+        this.linePreviewEnd = this.resolveLineHoverPoint(pointer);
+        const nearVertex = this.findNearestVertex(pointer, this.worldTolerance(14));
+        this.hoveredSnapVertex = nearVertex ? nearVertex.copy() : undefined;
+        this.hoveredSnapGrid = nearVertex ? undefined : this.snapToGrid(pointer);
+        this.drawAll();
+        return;
+      }
+      if (this.lineDraftStart || this.lineToolPress) {
+        this.linePreviewEnd = this.resolveLineHoverPoint(pointer);
+        const nearVertex = this.findNearestVertex(pointer, this.worldTolerance(14));
+        this.hoveredSnapVertex = nearVertex ? nearVertex.copy() : undefined;
+        this.hoveredSnapGrid = nearVertex ? undefined : this.snapToGrid(pointer);
+        this.drawAll();
+        return;
+      }
       this.linePreviewEnd = undefined;
       this.hoveredSnapVertex = undefined;
       this.hoveredSnapGrid = undefined;
+      return;
+    }
+
+    this.linePreviewEnd = undefined;
+    this.hoveredSnapVertex = undefined;
+    this.hoveredSnapGrid = undefined;
+
+    if (mode !== "normal") {
+      return;
     }
 
     if (this.interactionState.type === "potentialClick") {
@@ -1890,11 +2382,7 @@ export class RDDraw implements CommandHost {
         const forceRect = this.interactionState.forceRect;
         const selected = this.repository.getSelectedElements();
         const hitSelected = hit ? this.repository.isSelected(hit) : false;
-        if (
-          hit &&
-          hitSelected &&
-          !forceRect
-        ) {
+        if (hit && hitSelected && !forceRect) {
           const elements = selected.length > 0 ? selected : [hit];
           this.dragSession = {
             type: "move",
@@ -1904,25 +2392,26 @@ export class RDDraw implements CommandHost {
             totalDelta: new Vector(0, 0),
           };
           this.interactionState = { type: "dragging" };
-          this.performMoveDrag(pointer);
-        } else {
-          const rectAdditive = additive;
-          this.dragSession = {
-            type: "rect",
-            start: this.interactionState.startPointer,
-            current: pointer,
-            additive: rectAdditive,
-          };
-          this.selectionRect = {
-            x1: this.interactionState.startPointer.x,
-            y1: this.interactionState.startPointer.y,
-            x2: pointer.x,
-            y2: pointer.y,
-          };
-          this.interactionState = { type: "dragging" };
-          this.drawAll();
+          const fineFactor = ev.metaKey || ev.ctrlKey ? 0.2 : 1;
+          this.performMoveDrag(pointer, fineFactor);
           return;
         }
+
+        this.dragSession = {
+          type: "rect",
+          start: this.interactionState.startPointer,
+          current: pointer,
+          additive,
+        };
+        this.selectionRect = {
+          x1: this.interactionState.startPointer.x,
+          y1: this.interactionState.startPointer.y,
+          x2: pointer.x,
+          y2: pointer.y,
+        };
+        this.interactionState = { type: "dragging" };
+        this.drawAll();
+        return;
       }
     }
 
@@ -1943,18 +2432,80 @@ export class RDDraw implements CommandHost {
     }
     if (this.dragSession?.type === "loop-handle") {
       const loop = this.dragSession.loop;
-      const previewRadius = Math.max(1, pointer.minus(loop.origin).length());
-      loop.setRadius(previewRadius);
+      if (this.dragSession.handle === "radius") {
+        const previewRadius = Math.max(1, pointer.minus(loop.origin).length());
+        loop.setRadius(previewRadius);
+      } else if (this.dragSession.handle === "start") {
+        loop.setLoopBeginAngle(Math.atan2(pointer.y - loop.origin.y, pointer.x - loop.origin.x));
+      } else {
+        loop.setLoopEndAngle(Math.atan2(pointer.y - loop.origin.y, pointer.x - loop.origin.x));
+      }
       this.drawAll();
       return;
     }
     if (this.dragSession?.type === "move") {
-      this.performMoveDrag(pointer);
+      const fineFactor = ev.metaKey || ev.ctrlKey ? 0.2 : 1;
+      this.performMoveDrag(pointer, fineFactor);
       return;
     }
-    if (this.drawMode === "line" && this.lineDraftStart) {
-      this.drawAll();
+  }
+
+  mouseDown(ev: MouseEvent) {
+    this.setPrevXY(ev.offsetX, ev.offsetY);
+    const point = this.getPointer();
+    const precisePoint = this.getPointerPrecise();
+    this.interactionState = { type: "idle" };
+    this.selectionRect = undefined;
+
+    if (this.spacePanActive || ev.button === 1) {
+      this.panDragLast = new Vector(ev.offsetX, ev.offsetY);
+      this.interactionState = { type: "dragging" };
+      this.dragSession = undefined;
+      this.updateCursor();
+      return;
     }
+    const tool = this.resolveToolForEvent(ev);
+    this.pointerTool = tool;
+    tool.onDown(this, point, precisePoint, ev);
+    this.updateCursor();
+  }
+
+  mouseUp(ev: MouseEvent) {
+    this.setPrevXY(ev.offsetX, ev.offsetY);
+    const point = this.getPointer();
+    this.panDragLast = undefined;
+    const precisePoint = this.getPointerPrecise();
+    const tool = this.pointerTool ?? this.resolveToolForEvent(ev);
+    tool.onUp(this, point, precisePoint, ev);
+    this.pointerTool = undefined;
+    this.activeTool = this.tools[this.drawMode];
+    this.updateCursor();
+  }
+
+  move(ev: MouseEvent) {
+    // loggerVer(`offset ${ev.offsetX}  ${ev.offsetY}`);
+    // loggerVer(`screen ${ev.screenX}  ${ev.screenY}`);
+    this.setPrevXY(ev.offsetX, ev.offsetY);
+    const pointer = this.getPointer();
+
+    if (this.panDragLast) {
+      const currentRaw = new Vector(ev.offsetX, ev.offsetY);
+      const deltaRaw = currentRaw.minus(this.panDragLast);
+      this.panDragLast = currentRaw;
+      const offset = this.drawContext.getViewOffset();
+      this.drawContext.setViewOffset(
+        offset.add(new Vector(deltaRaw.x / config.scale, deltaRaw.y / config.scale))
+      );
+      this.drawAll();
+      this.updateCursor();
+      return;
+    }
+
+    const precise = this.getPointerPrecise();
+    this.updateHoverState(pointer, precise);
+    const tool = this.pointerTool ?? this.resolveToolForEvent(ev);
+    tool.onMove(this, pointer, precise, ev);
+    this.updateCursor();
   }
 
   private onKeyDown(ev: KeyboardEvent) {
@@ -1968,6 +2519,10 @@ export class RDDraw implements CommandHost {
     }
 
     if (this.isTextInput(ev)) {
+      return;
+    }
+
+    if (this.isModalOpen()) {
       return;
     }
 
@@ -2042,6 +2597,14 @@ export class RDDraw implements CommandHost {
       return;
     }
 
+    if (!isMeta && key === "g") {
+      ev.preventDefault();
+      this.gridSnapEnabled = !this.gridSnapEnabled;
+      this.setDslStatus(`Grid snap ${this.gridSnapEnabled ? "enabled" : "disabled"}.`, "neutral");
+      this.drawAll();
+      return;
+    }
+
     if (isMeta && key === "e") {
       ev.preventDefault();
       this.drawAll("svg");
@@ -2054,27 +2617,29 @@ export class RDDraw implements CommandHost {
       return;
     }
 
+    const nudgeFactor = isMeta ? 0.2 : 1;
+
     if (ev.key === "ArrowUp") {
       ev.preventDefault();
-      this.keyUp();
+      this.keyUp(nudgeFactor);
       return;
     }
 
     if (ev.key === "ArrowRight") {
       ev.preventDefault();
-      this.keyRight();
+      this.keyRight(nudgeFactor);
       return;
     }
 
     if (ev.key === "ArrowLeft") {
       ev.preventDefault();
-      this.keyLeft();
+      this.keyLeft(nudgeFactor);
       return;
     }
 
     if (ev.key === "ArrowDown") {
       ev.preventDefault();
-      this.keyDown();
+      this.keyDown(nudgeFactor);
       return;
     }
   }
@@ -2083,7 +2648,12 @@ export class RDDraw implements CommandHost {
     if (ev.code === "Space") {
       this.spacePanActive = false;
       this.panDragLast = undefined;
+      this.updateCursor();
     }
+  }
+
+  private isModalOpen(): boolean {
+    return document.querySelector(".modal.show") !== null;
   }
 
   private quickSaveSnapshot() {
@@ -2110,64 +2680,28 @@ export class RDDraw implements CommandHost {
     return tag === "INPUT" || tag === "TEXTAREA" || target.isContentEditable;
   }
 
-  keyUp() {
+  keyUp(stepFactor = 1) {
     loggerVer("keyUp");
-    const selected = this.repository.getSelectedElements();
-    if (selected.length === 0) {
-      return;
-    }
-    const delta = new Vector(0, -1).multi(1 / config.scale);
-    if (selected.length === 1) {
-      this.repository.doCommand(new Move(selected[0], delta));
-    } else {
-      this.repository.doCommand(new MoveGroup(selected, delta));
-    }
-    this.drawAll();
+    const delta = new Vector(0, -1).multi((1 / config.scale) * stepFactor);
+    this.nudgeSelection(delta);
   }
 
-  keyRight() {
+  keyRight(stepFactor = 1) {
     loggerVer("keyRight");
-    const selected = this.repository.getSelectedElements();
-    if (selected.length === 0) {
-      return;
-    }
-    const delta = new Vector(1, 0).multi(1 / config.scale);
-    if (selected.length === 1) {
-      this.repository.doCommand(new Move(selected[0], delta));
-    } else {
-      this.repository.doCommand(new MoveGroup(selected, delta));
-    }
-    this.drawAll();
+    const delta = new Vector(1, 0).multi((1 / config.scale) * stepFactor);
+    this.nudgeSelection(delta);
   }
 
-  keyLeft() {
+  keyLeft(stepFactor = 1) {
     loggerVer("keyLeft");
-    const selected = this.repository.getSelectedElements();
-    if (selected.length === 0) {
-      return;
-    }
-    const delta = new Vector(-1, 0).multi(1 / config.scale);
-    if (selected.length === 1) {
-      this.repository.doCommand(new Move(selected[0], delta));
-    } else {
-      this.repository.doCommand(new MoveGroup(selected, delta));
-    }
-    this.drawAll();
+    const delta = new Vector(-1, 0).multi((1 / config.scale) * stepFactor);
+    this.nudgeSelection(delta);
   }
 
-  keyDown() {
+  keyDown(stepFactor = 1) {
     loggerVer("keyDown");
-    const selected = this.repository.getSelectedElements();
-    if (selected.length === 0) {
-      return;
-    }
-    const delta = new Vector(0, 1).multi(1 / config.scale);
-    if (selected.length === 1) {
-      this.repository.doCommand(new Move(selected[0], delta));
-    } else {
-      this.repository.doCommand(new MoveGroup(selected, delta));
-    }
-    this.drawAll();
+    const delta = new Vector(0, 1).multi((1 / config.scale) * stepFactor);
+    this.nudgeSelection(delta);
   }
 
   noSelectMode() {
@@ -2215,7 +2749,7 @@ export class RDDraw implements CommandHost {
       defult = current.label;
     }
 
-    let text = window.prompt("input text( ex. \\int e^x dx)", defult);
+    let text = window.prompt("input text (plain) or TeX (ex. $\\\\int e^x dx$)", defult);
 
     if (text == null) {
       this.setDrawMode("normal");
@@ -2255,6 +2789,21 @@ export class RDDraw implements CommandHost {
    * so that the UI always reflects repository state.
    */
   drawAll(exportType: ExportType = "canvas") {
+    if (exportType !== "canvas") {
+      this.renderNow(exportType);
+      return;
+    }
+    if (this.renderScheduled) {
+      return;
+    }
+    this.renderScheduled = true;
+    window.requestAnimationFrame(() => {
+      this.renderScheduled = false;
+      this.renderNow("canvas");
+    });
+  }
+
+  private renderNow(exportType: ExportType = "canvas") {
     this.drawContext.setExportType(exportType);
 
     // clear
@@ -2286,12 +2835,13 @@ export class RDDraw implements CommandHost {
       return;
     }
 
-    if (this.drawMode === "line" && this.lineDraftStart) {
-      draw(this.drawContext, this.lineDraftStart, "canvas", "sub");
+    const previewStart = this.lineDraftStart ?? this.lineToolPress?.startVertex;
+    if (this.drawMode === "line" && previewStart) {
+      draw(this.drawContext, previewStart, "canvas", "sub");
       const pointer = this.linePreviewEnd ?? this.resolveLineHoverPoint(this.getPointer());
       this.drawContext.beginPath();
       this.drawContext.setStrokeColor("sub");
-      this.drawContext.moveTo(this.lineDraftStart.x, this.lineDraftStart.y);
+      this.drawContext.moveTo(previewStart.x, previewStart.y);
       this.drawContext.lineTo(pointer.x, pointer.y, "dash");
       this.drawContext.stroke();
       this.drawContext.closePath();
@@ -2303,6 +2853,8 @@ export class RDDraw implements CommandHost {
     if (this.hoveredSnapVertex) {
       draw(this.drawContext, this.hoveredSnapVertex, "canvas", "sub");
     }
+    this.drawHoverFeedback();
+    (this.pointerTool ?? this.activeTool).render(this, this.drawContext);
 
     const selected = this.repository.getSelectedElements();
     selected.forEach((elem) => {
@@ -2365,17 +2917,18 @@ export class RDDraw implements CommandHost {
   }
 
   private describeMode(): string {
+    const suffix = ` | zoom ${config.scale.toFixed(1)}x | snap ${this.gridSnapEnabled ? "on" : "off"}`;
     switch (this.drawMode) {
       case "normal":
-        return "Select";
+        return `Select${suffix}`;
       case "point":
-        return "Vertex tool";
+        return `Vertex tool${suffix}`;
       case "line":
-        return this.lineDraftStart ? "Propagator: pick end" : "Propagator: pick start";
+        return `${this.lineDraftStart ? "Propagator: pick end" : "Propagator: pick start"}${suffix}`;
       case "loop":
-        return "Loop tool";
+        return `Loop tool${suffix}`;
       case "string":
-        return "Text tool";
+        return `Text tool${suffix}`;
     }
     return "";
   }

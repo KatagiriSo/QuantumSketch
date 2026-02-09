@@ -6,18 +6,32 @@ import { loggerVer } from "../looger";
 import { ExportType } from "./ExportType";
 import { getColor } from "./UIColor";
 
+type MathJaxLike = {
+  startup?: { promise?: Promise<unknown> };
+  tex2svgPromise?: (math: string, options?: { display?: boolean; em?: number }) => Promise<HTMLElement>;
+};
+
+type TexCacheEntry = {
+  image: HTMLImageElement;
+  baselinePx: number;
+};
+
 /**
  * DrawContext
  * 
  * This class is used to draw on canvas. 
  */
 export class DrawContext {
+  static readonly TEX_READY_EVENT = "quantumSketch:tex-ready";
   exportType: ExportType = "canvas";
   private canvasContext: CanvasRenderingContext2D;
   private exportString: string = "";
   private coordinate: Vector = new Vector(0, 0);
   private scale: number = config.scale;
   private viewOffset: Vector = new Vector(0, 0);
+  private texCache: Map<string, TexCacheEntry> = new Map();
+  private texPending: Set<string> = new Set();
+
   constructor(context: CanvasRenderingContext2D) {
     this.canvasContext = context;
     this.canvasContext.font = "25px Arial";
@@ -310,10 +324,26 @@ export class DrawContext {
    */
   fillText(txt: string, x: number, y: number) {
     if (this.exportType == "canvas") {
+      const texBody = this.extractTexBody(txt);
+      if (texBody) {
+        if (this.tryDrawTex(texBody, x, y)) {
+          return;
+        }
+        // Fallback while MathJax is loading/rendering.
+        this.canvasContext.fillText(texBody, this.canvasX(x), this.canvasY(y));
+        return;
+      }
       this.canvasContext.fillText(txt, this.canvasX(x), this.canvasY(y));
       return;
     }
     if (this.exportType == "tikz") {
+      const texBody = this.extractTexBody(txt);
+      if (texBody) {
+        this.addExport(
+          `\\node[align=left] at (${x},${-y}) {\\scalebox{0.3} { $${texBody}$}};`
+        );
+        return;
+      }
       // \node[align=left] at (19,19) {\tiny $\int dx y^2$};
       this.addExport(
         `\\node[align=left] at (${x},${-y}) {\\scalebox{0.3} { $${txt}$}};`
@@ -329,6 +359,105 @@ export class DrawContext {
       );
       return;
     }
+  }
+
+  private extractTexBody(txt: string): string | undefined {
+    const trimmed = txt.trim();
+    if (!trimmed) {
+      return undefined;
+    }
+    if (trimmed.startsWith("$$") && trimmed.endsWith("$$") && trimmed.length > 4) {
+      return trimmed.slice(2, -2).trim();
+    }
+    if (trimmed.startsWith("$") && trimmed.endsWith("$") && trimmed.length > 2) {
+      return trimmed.slice(1, -1).trim();
+    }
+    if (trimmed.startsWith("\\(") && trimmed.endsWith("\\)") && trimmed.length > 4) {
+      return trimmed.slice(2, -2).trim();
+    }
+    if (trimmed.startsWith("\\[") && trimmed.endsWith("\\]") && trimmed.length > 4) {
+      return trimmed.slice(2, -2).trim();
+    }
+    // Also accept raw TeX-like strings for convenience (e.g. "\int_0^1 x^2 dx").
+    if (/[\\^_{}]/.test(trimmed)) {
+      return trimmed;
+    }
+    return undefined;
+  }
+
+  private tryDrawTex(texBody: string, x: number, y: number): boolean {
+    const fillStyle = String(this.canvasContext.fillStyle ?? "#000000");
+    const cacheKey = `${fillStyle}|${texBody}`;
+    const cached = this.texCache.get(cacheKey);
+    if (cached) {
+      this.canvasContext.drawImage(
+        cached.image,
+        this.canvasX(x),
+        this.canvasY(y) - cached.baselinePx
+      );
+      return true;
+    }
+
+    if (this.texPending.has(cacheKey)) {
+      return false;
+    }
+
+    const mathJax = (window as Window & { MathJax?: MathJaxLike }).MathJax;
+    if (!mathJax?.tex2svgPromise) {
+      return false;
+    }
+
+    this.texPending.add(cacheKey);
+    const startup = mathJax.startup?.promise ?? Promise.resolve();
+    startup
+      .then(() => mathJax.tex2svgPromise!(texBody, { display: false, em: 25 / 16 }))
+      .then((wrapper) => {
+        const svgNode = wrapper.querySelector("svg") as SVGSVGElement | null;
+        if (!svgNode) {
+          return;
+        }
+        svgNode.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+        const style = svgNode.getAttribute("style") ?? "";
+        svgNode.setAttribute("style", `${style}; color: ${fillStyle}; font-size: 25px;`);
+        const serialized = new XMLSerializer().serializeToString(svgNode);
+        const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(serialized)}`;
+        const image = new Image();
+        image.onload = () => {
+          const baselinePx = this.estimateTexBaselinePx(svgNode, image.height);
+          this.texCache.set(cacheKey, { image, baselinePx });
+          this.texPending.delete(cacheKey);
+          window.dispatchEvent(new CustomEvent(DrawContext.TEX_READY_EVENT));
+        };
+        image.onerror = () => {
+          this.texPending.delete(cacheKey);
+        };
+        image.src = dataUrl;
+      })
+      .catch((error) => {
+        loggerVer(`MathJax render failed: ${error}`);
+        this.texPending.delete(cacheKey);
+      });
+    return false;
+  }
+
+  private estimateTexBaselinePx(svgNode: SVGSVGElement, fallbackHeight: number): number {
+    const viewBox = svgNode.getAttribute("viewBox");
+    if (!viewBox) {
+      return fallbackHeight * 0.8;
+    }
+    const values = viewBox
+      .split(/[ ,]+/)
+      .map((value) => Number.parseFloat(value))
+      .filter((value) => Number.isFinite(value));
+    if (values.length !== 4) {
+      return fallbackHeight * 0.8;
+    }
+    const minY = values[1];
+    const height = values[3];
+    if (Math.abs(height) < 1e-6) {
+      return fallbackHeight * 0.8;
+    }
+    return (-minY / height) * fallbackHeight;
   }
 
   /**

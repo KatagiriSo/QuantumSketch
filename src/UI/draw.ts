@@ -13,6 +13,22 @@ import { ExportType } from "./ExportType";
 
 const CURVED_LINE_SEGMENTS = 48;
 const EPSILON = 1e-6;
+const sampledLineCache = new WeakMap<Line, Map<number, { key: string; points: Vector[] }>>();
+const sampledCoilCache = new WeakMap<Line, { key: string; points: Vector[] }>();
+
+function lineGeometryKey(line: Line): string {
+  const control = line.control
+    ? `${line.control.x.toFixed(4)},${line.control.y.toFixed(4)}`
+    : "none";
+  return [
+    line.origin.x.toFixed(4),
+    line.origin.y.toFixed(4),
+    line.to.x.toFixed(4),
+    line.to.y.toFixed(4),
+    control,
+    (line.arrowRotation ?? 0).toFixed(4),
+  ].join("|");
+}
 
 function lineDirectionAt(line: Line, t: number): Vector {
   let tangent = line.tangentAt(t);
@@ -33,11 +49,19 @@ function lineNormalAt(line: Line, t: number): Vector {
 
 function sampleLinePoints(line: Line, segments = line.control ? CURVED_LINE_SEGMENTS : 1): Vector[] {
   const count = Math.max(1, segments);
+  const geometryKey = lineGeometryKey(line);
+  const cacheBySegments = sampledLineCache.get(line) ?? new Map<number, { key: string; points: Vector[] }>();
+  const cached = cacheBySegments.get(count);
+  if (cached && cached.key === geometryKey) {
+    return cached.points;
+  }
   const points: Vector[] = [];
   for (let i = 0; i <= count; i++) {
     const t = count === 0 ? 0 : i / count;
     points.push(line.pointAt(t));
   }
+  cacheBySegments.set(count, { key: geometryKey, points });
+  sampledLineCache.set(line, cacheBySegments);
   return points;
 }
 
@@ -80,6 +104,11 @@ function lineMidDirection(line: Line): Vector {
 }
 
 function sampleCoilPoints(line: Line): Vector[] {
+  const geometryKey = lineGeometryKey(line);
+  const cached = sampledCoilCache.get(line);
+  if (cached && cached.key === geometryKey) {
+    return cached.points;
+  }
   const segmentLength = 1.0;
   const aspect = 0.9;
   const amplitude = 0.5;
@@ -87,6 +116,7 @@ function sampleCoilPoints(line: Line): Vector[] {
   const basePoints = sampleLinePoints(line, segments);
   const { cumulative, total } = computeCumulativeLengths(basePoints);
   if (total < segmentLength) {
+    sampledCoilCache.set(line, { key: geometryKey, points: basePoints });
     return basePoints;
   }
 
@@ -106,6 +136,7 @@ function sampleCoilPoints(line: Line): Vector[] {
         .add(normal.multi(v))
     );
   }
+  sampledCoilCache.set(line, { key: geometryKey, points: coilPoints });
   return coilPoints;
 }
 

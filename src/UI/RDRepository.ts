@@ -38,7 +38,8 @@ export class RDRepository {
     this.selectedIds.clear();
     this.selectionOrder = [];
     this.currentSubId = undefined;
-    this.elements = this.loadElements(saveJson["elements"]);
+    const rawElements = Array.isArray(saveJson["elements"]) ? saveJson["elements"] : [];
+    this.elements = this.loadElements(rawElements);
     this.reindexElements();
     this.rebindGraphReferences();
     this.syncSelectionState();
@@ -49,28 +50,41 @@ export class RDRepository {
     setElemIDCounter(this.idCount + 1);
   }
 
-  loadElements(saveJsonElements: any[]): Elem[] {
+  loadElements(saveJsonElements: unknown[]): Elem[] {
     return saveJsonElements
-      .flatMap((raw) => {
-        const json = JSON.parse(raw);
-        const shape = json["shape"];
-        if (!shape) {
-          return undefined;
-        }
-        switch (shape as Shape) {
-          case "Line":
-            return makeLine(json);
-          case "Loop":
-            return makeLoop(json);
-          case "Point":
-            return makeVector(json);
-          case "String":
-            return makeMyString(json);
-          default:
-            return undefined;
-        }
-      })
-      .flatMap((e) => (e ? [e] : []));
+      .map((raw) => this.parseSerializedElement(raw))
+      .flatMap((elem) => (elem ? [elem] : []));
+  }
+
+  private parseSerializedElement(raw: unknown): Elem | undefined {
+    if (typeof raw !== "string") {
+      return undefined;
+    }
+
+    let json: Record<string, unknown>;
+    try {
+      json = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+
+    const shape = json["shape"];
+    if (typeof shape !== "string") {
+      return undefined;
+    }
+
+    switch (shape as Shape) {
+      case "Line":
+        return makeLine(json);
+      case "Loop":
+        return makeLoop(json);
+      case "Point":
+        return makeVector(json);
+      case "String":
+        return makeMyString(json);
+      default:
+        return undefined;
+    }
   }
 
   getElement(id: string): Elem | undefined {
@@ -222,9 +236,18 @@ export class RDRepository {
     });
 
     const sorted = [...nearByBounds]
-      .map((elem) => ({ elem, distance: elem.formalDistance(point) }))
+      .map((elem) => ({
+        elem,
+        distance: elem.formalDistance(point),
+        zOrder: this.elements.findIndex((target) => target.id === elem.id),
+      }))
       .filter(({ distance }) => Number.isFinite(distance))
-      .sort((a, b) => a.distance - b.distance);
+      .sort((a, b) => {
+        if (Math.abs(a.distance - b.distance) > 1e-6) {
+          return a.distance - b.distance;
+        }
+        return b.zOrder - a.zOrder;
+      });
 
     if (sorted.length === 0) {
       return [];
@@ -270,6 +293,18 @@ export class RDRepository {
   findNearest(point: Vector, tolerance = 2): Elem | undefined {
     const nearElements = this.findMostNearElements(point, this.elements, tolerance);
     return nearElements.length > 0 ? nearElements[0] : undefined;
+  }
+
+  findNearestEdge(point: Vector, tolerance = 2): Elem | undefined {
+    const candidates = this.elements.filter((elem) => !isVector(elem));
+    const nearElements = this.findMostNearElements(point, candidates, tolerance);
+    return nearElements.length > 0 ? nearElements[0] : undefined;
+  }
+
+  hitTest(point: Vector, zoom: number, pxTolerance = 12): Elem | undefined {
+    const safeZoom = Math.max(zoom, 0.0001);
+    const tolerance = Math.max(0.25, pxTolerance / safeZoom);
+    return this.findNearest(point, tolerance);
   }
 
   findAllNear(point: Vector, tolerance = 2): Elem[] {

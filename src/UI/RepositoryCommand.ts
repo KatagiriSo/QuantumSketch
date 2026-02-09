@@ -52,6 +52,67 @@ function anchorPoint(target: Elem): Vector {
   return new Vector(0, 0);
 }
 
+type VertexSnapshot = { vertex: Vertex; index: number };
+
+function isVertexDangling(repo: RDRepository, vertexId: string): boolean {
+  const lineConnected = repo.lineList.some(
+    (line) => line.startVertexId === vertexId || line.endVertexId === vertexId
+  );
+  if (lineConnected) {
+    return false;
+  }
+  return !repo.loopList.some((loop) => loop.centerVertexId === vertexId);
+}
+
+function collectDanglingVertexSnapshots(
+  repo: RDRepository,
+  candidateIds?: Set<string>
+): VertexSnapshot[] {
+  return repo.vertexList
+    .filter((vertex) => {
+      if (candidateIds && candidateIds.size > 0 && !candidateIds.has(vertex.id)) {
+        return false;
+      }
+      return isVertexDangling(repo, vertex.id);
+    })
+    .map((vertex) => ({ vertex, index: repo.elements.indexOf(vertex) }))
+    .filter((snapshot) => snapshot.index >= 0)
+    .sort((a, b) => a.index - b.index);
+}
+
+function removeVertexSnapshots(repo: RDRepository, snapshots: VertexSnapshot[]): void {
+  [...snapshots]
+    .sort((a, b) => b.index - a.index)
+    .forEach(({ vertex, index }) => {
+      if (repo.elements[index]?.id === vertex.id) {
+        repo.elements.splice(index, 1);
+      } else {
+        const fallbackIndex = repo.elements.findIndex((elem) => elem.id === vertex.id);
+        if (fallbackIndex >= 0) {
+          repo.elements.splice(fallbackIndex, 1);
+        }
+      }
+      const vertexIndex = repo.vertexList.indexOf(vertex);
+      if (vertexIndex >= 0) {
+        repo.vertexList.splice(vertexIndex, 1);
+      }
+    });
+}
+
+function restoreVertexSnapshots(repo: RDRepository, snapshots: VertexSnapshot[]): void {
+  snapshots
+    .sort((a, b) => a.index - b.index)
+    .forEach(({ vertex, index }) => {
+      if (!repo.elements.some((elem) => elem.id === vertex.id)) {
+        const insertIndex = Math.min(index, repo.elements.length);
+        repo.elements.splice(insertIndex, 0, vertex);
+      }
+      if (!repo.vertexList.includes(vertex)) {
+        repo.vertexList.push(vertex);
+      }
+    });
+}
+
 export class SetVertex implements RepositoryCommand {
   vertex: Vertex;
   copyVertex: Vertex;
@@ -138,12 +199,14 @@ export class SetLoop implements RepositoryCommand {
 export class Delete implements RepositoryCommand {
   target: Elem;
   private index: number = -1;
+  private danglingSnapshots: VertexSnapshot[] = [];
 
   constructor(target: Elem) {
     this.target = target;
   }
 
   action(repo: RDRepository): void {
+    this.danglingSnapshots = [];
     this.index = repo.elements.indexOf(this.target);
     if (this.index === -1) {
       return;
@@ -167,6 +230,21 @@ export class Delete implements RepositoryCommand {
         repo.lineList.splice(idx, 1);
       }
     }
+
+    const candidateIds = new Set<string>();
+    if (isLine(this.target)) {
+      if (this.target.startVertexId) {
+        candidateIds.add(this.target.startVertexId);
+      }
+      if (this.target.endVertexId) {
+        candidateIds.add(this.target.endVertexId);
+      }
+    }
+    if (isLoop(this.target) && this.target.centerVertexId) {
+      candidateIds.add(this.target.centerVertexId);
+    }
+    this.danglingSnapshots = collectDanglingVertexSnapshots(repo, candidateIds);
+    removeVertexSnapshots(repo, this.danglingSnapshots);
   }
 
   unaction(repo: RDRepository): void {
@@ -187,6 +265,7 @@ export class Delete implements RepositoryCommand {
         repo.lineList.push(this.target);
       }
     }
+    restoreVertexSnapshots(repo, this.danglingSnapshots);
   }
 }
 
@@ -499,12 +578,14 @@ export class MoveGroup implements RepositoryCommand {
 export class DeleteGroup implements RepositoryCommand {
   targets: Elem[];
   snapshots: { elem: Elem; index: number }[] = [];
+  danglingSnapshots: VertexSnapshot[] = [];
 
   constructor(targets: Elem[]) {
     this.targets = targets;
   }
 
   action(repo: RDRepository): void {
+    this.danglingSnapshots = [];
     this.snapshots = this.targets
       .map((target) => ({ elem: target, index: repo.elements.indexOf(target) }))
       .filter((snapshot) => snapshot.index !== -1)
@@ -533,6 +614,9 @@ export class DeleteGroup implements RepositoryCommand {
           }
         }
       });
+
+    this.danglingSnapshots = collectDanglingVertexSnapshots(repo);
+    removeVertexSnapshots(repo, this.danglingSnapshots);
   }
 
   unaction(repo: RDRepository): void {
@@ -550,6 +634,7 @@ export class DeleteGroup implements RepositoryCommand {
           repo.lineList.push(elem as Line);
         }
       });
+    restoreVertexSnapshots(repo, this.danglingSnapshots);
   }
 }
 

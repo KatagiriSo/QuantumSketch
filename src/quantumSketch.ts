@@ -3,8 +3,16 @@
 import { DrawContext } from "./UI/DrawContext"
 import { RDDraw } from "./UI/RDDraw"
 
-let canvas = document.getElementById("canvas") as HTMLCanvasElement
-let context_ = canvas.getContext("2d")!
+declare global {
+  interface Window {
+    __quantumSketchInitialized?: boolean;
+  }
+}
 
-let drawContext = new DrawContext(context_);
-new RDDraw(canvas, drawContext);
+if (!window.__quantumSketchInitialized) {
+  window.__quantumSketchInitialized = true;
+  const canvas = document.getElementById("canvas") as HTMLCanvasElement;
+  const context_ = canvas.getContext("2d")!;
+  const drawContext = new DrawContext(context_);
+  new RDDraw(canvas, drawContext);
+}

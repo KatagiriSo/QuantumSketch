@@ -667,6 +667,7 @@
                     </div>
                     <div class="move">
                         <p>Use the arrow keys to nudge the selection by one grid unit.</p>
+                        <p>Hold Ctrl / ⌘ while nudging or dragging to move in fine steps.</p>
                         <p>Press Delete or Backspace to remove the current selection.</p>
                         <p>Drag a vertex to move all connected lines/loops; hold Alt while dragging a line endpoint to detach from vertex.</p>
                     </div>
@@ -676,8 +677,11 @@
                         <p>Ctrl / ⌘ + S performs Quick Save to browser local storage (no download dialog).</p>
                         <p>Ctrl / ⌘ + A selects all, Ctrl / ⌘ + C copies, Ctrl / ⌘ + X cuts, Ctrl / ⌘ + V pastes, Ctrl / ⌘ + E exports SVG text, Ctrl / ⌘ + P exports TikZ.</p>
                         <p>Mouse wheel zooms. Hold Space and drag to pan the canvas.</p>
+                        <p>Trackpad horizontal two-finger scroll pans the canvas. Two-finger pinch zooms around your fingers.</p>
+                        <p>Press <code>G</code> to toggle grid snap on/off.</p>
                         <p>Press Esc to cancel a propagator draft and return to the Select tool.</p>
                         <p>Use the <strong>DSL Studio</strong> panel for paper-quality diagram authoring: quick command, macro builder, and script editor.</p>
+                        <p>Text labels support TeX. Example: <code>$\\int_0^1 x^2 \\, dx$</code> or <code>\\(E=mc^2\\)</code>.</p>
                         <p>Use <strong>Diagram catalog (editable macro)</strong> to load a template macro into <code>dsl-script</code>, tweak it, and run immediately.</p>
                         <p>For scripted workflows, write one command per line in <code>dsl-script</code> and run with <code>Ctrl/⌘ + Enter</code> or the Run Script button.</p>
                         <p>Press <code>/</code> to focus the quick command box (<code>dsl-input</code>), then <code>Enter</code> to execute instantly.</p>
@@ -742,6 +746,17 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath: [['$', '$'], ['\\(', '\\)']]
+            },
+            svg: {
+                fontCache: 'global'
+            }
+        };
+    </script>
+    <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
     <script src="main.js" async defer></script>
 </body>
 
